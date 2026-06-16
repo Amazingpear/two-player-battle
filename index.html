@@ -3215,7 +3215,9 @@ function loop(timestamp) {
     sendOnlineState();
   } else if (onlineMode === 'online' && onlineRole === 'guest') {
     sendOnlineKeys(timestamp);
-    // draw() is called from applyOnlineState when state packet arrives
+    // draw() is triggered by incoming state packets via applyOnlineState
+    requestAnimationFrame(loop);
+    return;
   } else {
     update(dt, timestamp);
     draw();
@@ -3428,6 +3430,10 @@ function connectOnline() {
     }
 
     if (msg.type === 'state') {
+      if (canvas.style.display === 'none') {
+        showScreen('hud');
+        canvas.style.display = 'block';
+      }
       applyOnlineState(msg);
     }
 
@@ -3548,7 +3554,7 @@ function applyOnlineState(state) {
       burns: new Array(pd.burnCount).fill({ timeLeft: 1 }),
       poisonStacks: pd.poisonStacks,
       slowMult: pd.slowMult,
-      _trapCount: pd.trapCount,
+      traps: pd.trapCount,
       scrap: pd.scrap,
       abilityTimer: pd.abilityTimer,
       abilityActive: pd.abilityActive,
@@ -3575,19 +3581,6 @@ function sendOnlineKeys(now) {
   onlineWs.send(JSON.stringify({ type: 'keys', pressed: { ...keys } }));
 }
 
-// Patch drawPlayer for guest-side trap count (owners aren't serialized)
-const _origDrawPlayer = drawPlayer;
-function drawPlayer(player) {
-  if (onlineMode === 'online' && onlineRole === 'guest' && player._trapCount !== undefined) {
-    const fakeTraps = new Array(player._trapCount).fill({ owner: player });
-    const saved = traps;
-    traps = fakeTraps;
-    _origDrawPlayer(player);
-    traps = saved;
-  } else {
-    _origDrawPlayer(player);
-  }
-}
 </script>
 </body>
 </html>
