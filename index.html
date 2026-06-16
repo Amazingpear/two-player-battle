@@ -1,0 +1,3595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Top-Down Battle</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #1a1a1a;
+    color: #eee;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  h1 { margin: 16px 0 8px; }
+  #gameCanvas {
+    background: #4a5260;
+    border: 3px solid #7a8492;
+    display: none;
+    max-width: 95vw;
+    max-height: 85vh;
+    height: auto;
+  }
+  .overlay {
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 10px;
+    padding: 24px 32px;
+    max-width: 700px;
+    text-align: center;
+  }
+  .panels {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+  .panel {
+    background: #2b2b2b;
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 220px;
+  }
+  .panel h3 { margin-top: 0; }
+  select {
+    width: 100%;
+    padding: 8px;
+    font-size: 15px;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background: #1f1f1f;
+    color: #eee;
+    margin-top: 6px;
+  }
+  button {
+    margin-top: 18px;
+    padding: 10px 28px;
+    font-size: 17px;
+    border-radius: 6px;
+    border: none;
+    background: #3498db;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:hover { background: #2d80ba; }
+  #hud {
+    display: none;
+    width: 1350px;
+    max-width: 95vw;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0;
+    font-size: 14px;
+  }
+  .hpbar {
+    width: 100%;
+    height: 18px;
+    background: #444;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid #666;
+  }
+  .hpfill { height: 100%; transition: width 0.1s linear; }
+  .hud-entry { flex: 1 1 180px; max-width: 320px; }
+  .controls-hint {
+    font-size: 12px;
+    color: #999;
+    margin-top: 16px;
+  }
+  #gameOver {
+    display: none;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.85);
+    padding: 30px 50px;
+    border-radius: 10px;
+    text-align: center;
+    z-index: 10;
+  }
+  #wrapper { position: relative; }
+</style>
+</head>
+<body>
+<h1>Top-Down Battle</h1>
+
+<!-- Online: connect screen -->
+<div id="onlineConnect" class="overlay" style="display:none; text-align:center; max-width:480px; margin:40px auto;">
+  <h2>Play Online</h2>
+  <p style="color:#aaa; margin-bottom:20px;">Enter the server address to connect. If you're hosting, start the server first with <code>node server.js</code> in your terminal.</p>
+  <input id="serverIpInput" value="localhost" style="padding:10px; font-size:15px; width:260px; border-radius:6px; border:1px solid #555; background:#1f1f1f; color:#eee;">
+  <div style="margin-top:12px;">
+    <button id="onlineConnectBtn" style="font-size:15px; padding:10px 28px;">Connect &amp; Find Match</button>
+  </div>
+  <div id="onlineConnectStatus" style="color:#aaa; margin-top:14px; min-height:20px;"></div>
+  <button id="onlineConnectBackBtn" style="background:#555; margin-top:16px;">← Back</button>
+</div>
+
+<!-- Online: matchmaking queue screen -->
+<div id="onlineQueue" class="overlay" style="display:none; text-align:center; max-width:480px; margin:40px auto;">
+  <h2>Finding a Match…</h2>
+  <div id="queueStatus" style="color:#aaa; margin:20px 0; font-size:16px;">Searching for an opponent…</div>
+  <div style="font-size:28px; margin:20px 0;">⏳</div>
+  <button id="cancelQueueBtn" style="background:#555;">Cancel</button>
+</div>
+
+<!-- Online: loadout lobby screen -->
+<div id="onlineLobbyScreen" class="overlay" style="display:none;">
+  <h2 style="text-align:center; margin-bottom:6px;">Match Found — Choose Your Loadout</h2>
+  <p id="lobbyRoleLabel" style="text-align:center; color:#aaa; margin-bottom:16px;"></p>
+  <div class="panels" style="justify-content:center;">
+
+    <div class="panel" id="myLoadoutPanel">
+      <h3>Your Loadout</h3>
+      <select id="onlineMyClass">
+        <option value="sniper">Sniper</option>
+        <option value="shotgunner">Shotgunner</option>
+        <option value="flamethrower">Flamethrower</option>
+        <option value="sprayer">Sprayer</option>
+        <option value="melee">Melee</option>
+        <option value="brawler">Brawler</option>
+        <option value="slasher">Slasher</option>
+        <option value="witch">Witch</option>
+        <option value="trapper">Trapper</option>
+        <option value="molotov">Molotov</option>
+        <option value="trapLayer">Trap Layer</option>
+        <option value="cannon">Cannon</option>
+        <option value="ninja">Ninja</option>
+        <option value="sentry">Sentry</option>
+      </select>
+      <select id="onlineMyPerk" style="margin-top:6px;">
+        <option value="none">No Perk</option>
+        <option value="speed">+Speed</option>
+        <option value="health">+Health</option>
+        <option value="bulletSpeed">+Bullet Speed</option>
+        <option value="regen">Health Regen</option>
+        <option value="shoulderCannon">Shoulder Cannon</option>
+        <option value="shoulderShotgun">Shoulder Shotgun</option>
+        <option value="shoulderTazer">Shoulder Tazer</option>
+        <option value="range">+Range</option>
+        <option value="fastShoot">Faster Shooting</option>
+      </select>
+      <select id="onlineMyPerk2" style="margin-top:6px;">
+        <option value="none">No 2nd Perk</option>
+        <option value="speed">+Speed</option>
+        <option value="health">+Health</option>
+        <option value="bulletSpeed">+Bullet Speed</option>
+        <option value="regen">Health Regen</option>
+        <option value="shoulderCannon">Shoulder Cannon</option>
+        <option value="shoulderShotgun">Shoulder Shotgun</option>
+        <option value="shoulderTazer">Shoulder Tazer</option>
+        <option value="range">+Range</option>
+        <option value="fastShoot">Faster Shooting</option>
+      </select>
+    </div>
+
+    <div class="panel" id="hostMapPanel" style="display:none;">
+      <h3>Map <span style="font-size:11px; color:#aaa;">(host picks)</span></h3>
+      <select id="onlineMapSelect">
+        <option value="open">Open Arena</option>
+        <option value="cross">Crossroads</option>
+        <option value="pillars">Pillar Field</option>
+        <option value="diagonal">Diagonal Divide</option>
+        <option value="fortress">Fortress</option>
+        <option value="arena2">Quad Rooms</option>
+        <option value="bridge">Bridge</option>
+        <option value="spiral">Spiral</option>
+        <option value="islands">Islands</option>
+        <option value="building">Building</option>
+      </select>
+      <div id="onlineMapName" style="color:#aaa; font-size:13px; margin-top:8px;"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Opponent</h3>
+      <div id="opponentClass" style="font-size:15px; color:#eee; margin-bottom:8px;">Waiting…</div>
+      <div id="opponentPerk" style="font-size:13px; color:#aaa;"></div>
+      <div id="opponentPerk2" style="font-size:13px; color:#aaa;"></div>
+      <div id="opponentMap" style="font-size:13px; color:#aaa; margin-top:6px;"></div>
+      <div id="opponentReadyLabel" style="margin-top:12px; font-size:13px; color:#e74c3c;">Not ready</div>
+    </div>
+
+  </div>
+
+  <div style="text-align:center; margin-top:20px;">
+    <button id="onlineReadyBtn" style="font-size:16px; padding:12px 36px; background:#27ae60;">✓ Ready</button>
+    <button id="onlineLeaveLobbyBtn" style="background:#555; margin-left:12px;">Leave</button>
+  </div>
+  <div id="lobbyCountdown" style="text-align:center; color:#f1c40f; font-size:18px; margin-top:12px; min-height:24px;"></div>
+</div>
+
+<div id="setup" class="overlay">
+  <p>Choose a map and a class for each player, then start the battle.</p>
+  <div class="panels">
+    <div class="panel">
+      <h3>Map</h3>
+      <select id="mapSelect">
+        <option value="open">Open Arena</option>
+        <option value="cross">Crossroads</option>
+        <option value="pillars">Pillar Field</option>
+        <option value="diagonal">Diagonal Divide</option>
+        <option value="fortress">Fortress</option>
+        <option value="arena2">Quad Rooms</option>
+        <option value="bridge">Bridge</option>
+        <option value="spiral">Spiral</option>
+        <option value="islands">Islands</option>
+        <option value="building">Building</option>
+      </select>
+    </div>
+    <div class="panel">
+      <h3>Player 1 (WASD / Space)</h3>
+      <select id="p1Class">
+        <option value="sniper">Sniper</option>
+        <option value="shotgunner">Shotgunner</option>
+        <option value="flamethrower">Flamethrower</option>
+        <option value="sprayer">Sprayer</option>
+        <option value="melee">Melee</option>
+        <option value="brawler">Brawler</option>
+        <option value="slasher">Slasher</option>
+        <option value="witch">Witch</option>
+        <option value="trapper">Trapper</option>
+        <option value="molotov">Molotov</option>
+        <option value="trapLayer">Trap Layer</option>
+        <option value="cannon">Cannon</option>
+        <option value="ninja">Ninja</option>
+        <option value="sentry">Sentry</option>
+      </select>
+      <select id="p1Perk">
+        <option value="none">No Perk</option>
+        <option value="speed">+Speed</option>
+        <option value="health">+Health</option>
+        <option value="bulletSpeed">+Bullet Speed</option>
+        <option value="regen">Health Regen</option>
+        <option value="shoulderCannon">Shoulder Cannon</option>
+        <option value="shoulderShotgun">Shoulder Shotgun</option>
+        <option value="shoulderTazer">Shoulder Tazer</option>
+        <option value="range">+Range</option>
+        <option value="fastShoot">Faster Shooting</option>
+      </select>
+      <select id="p1Perk2">
+        <option value="none">No 2nd Perk</option>
+        <option value="speed">+Speed</option>
+        <option value="health">+Health</option>
+        <option value="bulletSpeed">+Bullet Speed</option>
+        <option value="regen">Health Regen</option>
+        <option value="shoulderCannon">Shoulder Cannon</option>
+        <option value="shoulderShotgun">Shoulder Shotgun</option>
+        <option value="shoulderTazer">Shoulder Tazer</option>
+        <option value="range">+Range</option>
+        <option value="fastShoot">Faster Shooting</option>
+      </select>
+      <label style="display:block; margin-top:10px; font-size:14px;">
+        <input type="checkbox" id="p1AI"> AI controlled
+      </label>
+      <select id="p1Difficulty" style="margin-top:8px;">
+        <option value="easy">Easy AI</option>
+        <option value="medium" selected>Medium AI</option>
+        <option value="hard">Hard AI</option>
+      </select>
+    </div>
+    <div class="panel">
+      <h3>Player 2 (Arrow Keys / ?)</h3>
+      <select id="p2Class">
+        <option value="shotgunner">Shotgunner</option>
+        <option value="sniper">Sniper</option>
+        <option value="flamethrower">Flamethrower</option>
+        <option value="sprayer">Sprayer</option>
+        <option value="melee">Melee</option>
+        <option value="brawler">Brawler</option>
+        <option value="slasher">Slasher</option>
+        <option value="witch">Witch</option>
+        <option value="trapper">Trapper</option>
+        <option value="molotov">Molotov</option>
+        <option value="trapLayer">Trap Layer</option>
+        <option value="cannon">Cannon</option>
+        <option value="ninja">Ninja</option>
+        <option value="sentry">Sentry</option>
+      </select>
+      <select id="p2Perk">
+        <option value="none">No Perk</option>
+        <option value="speed">+Speed</option>
+        <option value="health">+Health</option>
+        <option value="bulletSpeed">+Bullet Speed</option>
+        <option value="regen">Health Regen</option>
+        <option value="shoulderCannon">Shoulder Cannon</option>
+        <option value="shoulderShotgun">Shoulder Shotgun</option>
+        <option value="shoulderTazer">Shoulder Tazer</option>
+        <option value="range">+Range</option>
+        <option value="fastShoot">Faster Shooting</option>
+      </select>
+      <select id="p2Perk2">
+        <option value="none">No 2nd Perk</option>
+        <option value="speed">+Speed</option>
+        <option value="health">+Health</option>
+        <option value="bulletSpeed">+Bullet Speed</option>
+        <option value="regen">Health Regen</option>
+        <option value="shoulderCannon">Shoulder Cannon</option>
+        <option value="shoulderShotgun">Shoulder Shotgun</option>
+        <option value="shoulderTazer">Shoulder Tazer</option>
+        <option value="range">+Range</option>
+        <option value="fastShoot">Faster Shooting</option>
+      </select>
+      <label style="display:block; margin-top:10px; font-size:14px;">
+        <input type="checkbox" id="p2AI"> AI controlled
+      </label>
+      <select id="p2Difficulty" style="margin-top:8px;">
+        <option value="easy">Easy AI</option>
+        <option value="medium" selected>Medium AI</option>
+        <option value="hard">Hard AI</option>
+      </select>
+    </div>
+    <div class="panel">
+      <h3>Number of AI Opponents</h3>
+      <input type="number" id="numAI" min="1" max="3" value="1" style="width:100%; padding:8px; font-size:15px; border-radius:6px; border:1px solid #555; background:#1f1f1f; color:#eee;">
+      <div style="font-size:12px; color:#999; margin-top:8px;">
+        If set above 1, every AI opponent uses Player 2's class, perks, and difficulty.
+      </div>
+      <label style="display:block; margin-top:10px; font-size:14px;">
+        <input type="checkbox" id="fogOfWar"> Fog of War (blocked line of sight)
+      </label>
+      <div style="font-size:12px; color:#999; margin-top:8px;">
+        Walls block your view, and AI opponents must scout the map and spot you before they react.
+      </div>
+      <label style="display:block; margin-top:10px; font-size:14px;">
+        <input type="checkbox" id="cameraZoom"> Zoom Camera (follow player, vs AI only)
+      </label>
+      <div style="font-size:12px; color:#999; margin-top:8px;">
+        Zooms in on Player 1 and scrolls the map around them instead of moving the player on screen. Only applies in 1 human vs AI matches.
+      </div>
+      <label style="display:block; margin-top:10px; font-size:14px;">
+        <input type="checkbox" id="coopMode"> Co-op (P1 & P2 vs AI)
+      </label>
+      <div style="font-size:12px; color:#999; margin-top:8px;">
+        Both players team up against the number of AI opponents set here, using the AI Opponent loadout below.
+      </div>
+    </div>
+    <div class="panel" id="aiOpponentPanel">
+      <h3>AI Opponent (Co-op)</h3>
+      <select id="aiClass">
+        <option value="shotgunner">Shotgunner</option>
+        <option value="sniper">Sniper</option>
+        <option value="flamethrower">Flamethrower</option>
+        <option value="sprayer">Sprayer</option>
+        <option value="melee">Melee</option>
+        <option value="brawler">Brawler</option>
+        <option value="slasher">Slasher</option>
+        <option value="witch">Witch</option>
+        <option value="trapper">Trapper</option>
+        <option value="molotov">Molotov</option>
+        <option value="trapLayer">Trap Layer</option>
+        <option value="cannon">Cannon</option>
+        <option value="ninja">Ninja</option>
+        <option value="sentry">Sentry</option>
+      </select>
+      <select id="aiPerk">
+        <option value="none">No Perk</option>
+        <option value="speed">+Speed</option>
+        <option value="health">+Health</option>
+        <option value="bulletSpeed">+Bullet Speed</option>
+        <option value="regen">Health Regen</option>
+        <option value="shoulderCannon">Shoulder Cannon</option>
+        <option value="shoulderShotgun">Shoulder Shotgun</option>
+        <option value="shoulderTazer">Shoulder Tazer</option>
+        <option value="range">+Range</option>
+        <option value="fastShoot">Faster Shooting</option>
+      </select>
+      <select id="aiPerk2">
+        <option value="none">No 2nd Perk</option>
+        <option value="speed">+Speed</option>
+        <option value="health">+Health</option>
+        <option value="bulletSpeed">+Bullet Speed</option>
+        <option value="regen">Health Regen</option>
+        <option value="shoulderCannon">Shoulder Cannon</option>
+        <option value="shoulderShotgun">Shoulder Shotgun</option>
+        <option value="shoulderTazer">Shoulder Tazer</option>
+        <option value="range">+Range</option>
+        <option value="fastShoot">Faster Shooting</option>
+      </select>
+      <select id="aiDifficulty" style="margin-top:8px;">
+        <option value="easy">Easy AI</option>
+        <option value="medium" selected>Medium AI</option>
+        <option value="hard">Hard AI</option>
+      </select>
+      <div style="font-size:12px; color:#999; margin-top:8px;">
+        If more than one AI opponent is set, they all use this class, perks, and difficulty.
+      </div>
+    </div>
+  </div>
+  <button id="startBtn">Start Battle</button>
+  <button id="onlineBtn" style="background:#2980b9; margin-left:12px;">🌐 Play Online</button>
+  <div class="controls-hint">
+    P1: W/A/S/D to move, Space to fire, E to place a bear trap / activate special ability &mdash; P2: Arrow keys to move, / to fire, . to place a bear trap / activate special ability.<br>
+    Players aim and shoot in the direction they last moved.<br>
+    Trap Layer carries up to 5 bear traps (gains one every 2 seconds) plus a pistol &mdash; traps stay armed until stepped on by an enemy.<br>
+    Sentry slowly collects scrap over time and spends it (E / . key) to deploy turret minions that auto-fire at the nearest enemy until destroyed.<br>
+    7 classes have a special ability: Shotgunner/Sprayer/Sniper/Flamethrower/Brawler/Melee use E / . key; Trap Layer uses Q / , key for Trap Barrage (scatters 5 traps in a ring).<br>
+    Check "AI controlled" for either player to have the computer play that character &mdash; it picks the class/perks you select.<br>
+    When playing against an AI, the human player aims with the mouse cursor instead of their movement direction.
+  </div>
+</div>
+
+<div id="hud"></div>
+
+<div id="wrapper">
+  <canvas id="gameCanvas" width="1350" height="900"></canvas>
+  <div id="gameOver">
+    <h2 id="winnerText">Player 1 Wins!</h2>
+    <button id="rematchBtn">Rematch (same setup)</button><br>
+    <button id="menuBtn" style="background:#555;">Back to Menu</button>
+  </div>
+</div>
+
+<script>
+const CANVAS_W = 1350, CANVAS_H = 900;
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// ---------- Class definitions ----------
+const CLASSES = {
+  sniper: {
+    label: 'Sniper', hp: 80, speed: 2.4, color: '#3498db', radius: 16,
+    weapon: { type: 'bullet', damage: 26, cooldown: 850, speed: 22, range: 1800, size: 4, spread: 0, pellets: 1, trail: true, homing: 0.006 },
+    ability: { type: 'homingShot', cooldown: 8000 }
+  },
+  shotgunner: {
+    label: 'Shotgunner', hp: 105, speed: 2.6, color: '#e67e22', radius: 17,
+    weapon: { type: 'bullet', damage: 10, cooldown: 1100, speed: 13, range: 650, size: 4, spread: 0.45, pellets: 8, knockback: 5.5 },
+    ability: { type: 'blastRing', cooldown: 7000 }
+  },
+  flamethrower: {
+    label: 'Flamethrower', hp: 115, speed: 2.1, color: '#e74c3c', radius: 17,
+    weapon: { type: 'flame', damage: 2, cooldown: 45, speed: 15, range: 420, size: 7, spread: 0.18, pellets: 1, fireRadius: 55, fireDuration: 3500, burnDamage: 8 },
+    ability: { type: 'napalmTrail', cooldown: 10000, duration: 3000 }
+  },
+  sprayer: {
+    label: 'Sprayer', hp: 95, speed: 2.9, color: '#2ecc71', radius: 15,
+    // 22% chance for one of its bullets to destroy an enemy projectile it collides with
+    weapon: { type: 'bullet', damage: 6, cooldown: 35, speed: 17, range: 750, size: 3, spread: 0.12, pellets: 1, shredChance: 0.22 },
+    ability: { type: 'overclock', cooldown: 11000, duration: 2500 }
+  },
+  melee: {
+    label: 'Melee', hp: 150, speed: 3.3, color: '#9b59b6', radius: 18,
+    weapon: { type: 'melee', damage: 62, cooldown: 420, range: 130, arc: 1.0 },
+    ability: { type: 'parry', cooldown: 8000, duration: 3000 }
+  },
+  brawler: {
+    label: 'Brawler', hp: 120, speed: 2.6, color: '#f1c40f', radius: 17,
+    weapon: { type: 'bullet', cooldown: 300, speed: 16, range: 900, size: 4, spread: 0.05, pellets: 1, minDamage: 5, maxDamage: 26 },
+    ability: { type: 'powerSlam', cooldown: 6000 }
+  },
+  slasher: {
+    label: 'Slasher', hp: 130, speed: 1.6, color: '#ff6ec7', radius: 18,
+    weapon: { type: 'melee', damage: 20, cooldown: 500, range: 220, width: 80, shape: 'rect', knockback: 22, arc: 1.7, sweep: 1.1 }
+  },
+  witch: {
+    label: 'Witch', hp: 110, speed: 2.7, color: '#27ae60', radius: 16,
+    weapon: { type: 'bullet', damage: 5, cooldown: 480, speed: 19, range: 700, size: 5, spread: 0.04, pellets: 1, poison: 1, poisonDamage: 6 }
+  },
+  trapper: {
+    label: 'Trapper', hp: 130, speed: 2.8, color: '#8e44ad', radius: 17,
+    weapon: {
+      type: 'net', damage: 0, cooldown: 1000, speed: 13, range: 650, size: 9, spread: 0.04, pellets: 1,
+      slowMult: 0.25, slowDuration: 2800,
+      meleeRange: 85, meleeDamage: 28, meleeCooldown: 350
+    },
+    ability: { type: 'webBurst', cooldown: 9000 }
+  },
+  molotov: {
+    label: 'Molotov', hp: 105, speed: 2.5, color: '#d35400', radius: 17,
+    weapon: {
+      type: 'molotov', damage: 15, cooldown: 750, speed: 14, range: 500, size: 6, spread: 0.05, pellets: 1,
+      fireRadius: 70, fireDuration: 5000, burnDamage: 10, explosionDamage: 12
+    }
+  },
+  trapLayer: {
+    label: 'Trap Layer', hp: 135, speed: 2.7, color: '#16a085', radius: 17,
+    weapon: { type: 'bullet', damage: 5, cooldown: 750, speed: 14, range: 500, size: 3, spread: 0.12, pellets: 1 },
+    trap: { damage: 45, triggerRadius: 18, stunDuration: 2400, slowMult: 0.08, max: 5, regenInterval: 2000, startCount: 2 },
+    ability: { type: 'trapBarrage', cooldown: 10000 }
+  },
+  cannon: {
+    label: 'Cannon', hp: 130, speed: 1.9, color: '#5d6d7e', radius: 19,
+    weapon: {
+      type: 'bullet', damage: 50, cooldown: 1750, speed: 9, range: 900, size: 14, spread: 0.02, pellets: 1,
+      knockback: 42, impactBurst: true
+    }
+  },
+  ninja: {
+    label: 'Ninja', hp: 115, speed: 3.4, color: '#2c3e50', radius: 15,
+    // dash: a fast burst that tears straight through walls, slicing any opponent in its path
+    weapon: { type: 'dash', damage: 45, cooldown: 750, dashSpeed: 24, dashDuration: 260, range: 320, knockback: 28 }
+  },
+  sentry: {
+    label: 'Sentry', hp: 150, speed: 2.2, color: '#7f8c8d', radius: 18,
+    weapon: { type: 'bullet', damage: 9, cooldown: 500, speed: 14, range: 550, size: 4, spread: 0.1, pellets: 1 },
+    // scrap is collected passively over time and spent to deploy turret minions that
+    // hunt down and shoot the nearest enemy on their own - no cap on how many can be active
+    scrapPerSec: 7, scrapMax: 120,
+    minion: { cost: 30, hp: 55, damage: 9, cooldown: 500, range: 520, bulletSpeed: 14, radius: 10 }
+  }
+};
+
+// ---------- AI difficulty definitions ----------
+const AI_DIFFICULTIES = {
+  easy: { label: 'Easy', aimError: 0.4, reactionDelay: 600, fireChance: 0.5, avoidLookaheadMult: 4 },
+  medium: { label: 'Medium', aimError: 0.15, reactionDelay: 250, fireChance: 0.85, avoidLookaheadMult: 6 },
+  hard: { label: 'Hard', aimError: 0.03, reactionDelay: 60, fireChance: 1.0, avoidLookaheadMult: 8 }
+};
+
+// ---------- Perk definitions ----------
+const PERKS = {
+  none: { label: 'None' },
+  speed: { label: '+Speed', speedMult: 1.25 },
+  health: { label: '+Health', hpMult: 1.3 },
+  bulletSpeed: { label: '+Bullet Speed', bulletSpeedMult: 1.7 },
+  regen: { label: 'Health Regen', regenPerSec: 2 },
+  shoulderCannon: { label: 'Shoulder Cannon', turret: 'cannon' },
+  shoulderShotgun: { label: 'Shoulder Shotgun', turret: 'shotgun' },
+  shoulderTazer: { label: 'Shoulder Tazer', turret: 'tazer' },
+  range: { label: '+Range', rangeMult: 1.4 },
+  fastShoot: { label: 'Faster Shooting', cooldownMult: 0.7 }
+};
+
+// ---------- Shoulder turret definitions ----------
+const TURRET_TYPES = {
+  cannon: { label: 'Cannon', cooldown: 500, range: 550, bulletSpeed: 16, damage: 4, pellets: 1, spread: 0, color: '#777' },
+  shotgun: { label: 'Shotgun', cooldown: 1000, range: 380, bulletSpeed: 12, damage: 4, pellets: 3, spread: 0.4, color: '#a05a2c' },
+  tazer: { label: 'Tazer', cooldown: 1500, range: 450, bulletSpeed: 13, damage: 2, pellets: 1, spread: 0, slowMult: 0.45, slowDuration: 900, color: '#f1c40f' }
+};
+
+// ---------- Map definitions ----------
+const MAPS = {
+  open: {
+    name: 'Open Arena',
+    walls: [
+      {x: 570, y: 375, w: 210, h: 150}, // central block
+      {x: 195, y: 375, w: 120, h: 120},
+      {x: 1035, y: 375, w: 120, h: 120},
+      {x: 600, y: 120, w: 150, h: 30},
+      {x: 600, y: 750, w: 150, h: 30},
+      {x: 300, y: 600, w: 70, h: 70},
+      {x: 975, y: 600, w: 70, h: 70},
+      {x: 440, y: 440, w: 50, h: 50},
+      {x: 860, y: 440, w: 50, h: 50}
+    ]
+  },
+  cross: {
+    name: 'Crossroads',
+    walls: [
+      {x: 0, y: 0, w: 570, h: 45},
+      {x: 780, y: 0, w: 570, h: 45},
+      {x: 0, y: 855, w: 570, h: 45},
+      {x: 780, y: 855, w: 570, h: 45},
+      {x: 0, y: 0, w: 45, h: 345},
+      {x: 0, y: 555, w: 45, h: 345},
+      {x: 1305, y: 0, w: 45, h: 345},
+      {x: 1305, y: 555, w: 45, h: 345},
+      {x: 630, y: 405, w: 90, h: 90},
+      {x: 300, y: 180, w: 50, h: 50},
+      {x: 1000, y: 180, w: 50, h: 50},
+      {x: 300, y: 670, w: 50, h: 50},
+      {x: 1000, y: 670, w: 50, h: 50},
+      {x: 460, y: 460, w: 40, h: 40},
+      {x: 850, y: 460, w: 40, h: 40},
+      {x: 650, y: 240, w: 50, h: 40},
+      {x: 650, y: 620, w: 50, h: 40}
+    ]
+  },
+  pillars: {
+    name: 'Pillar Field',
+    walls: [
+      {x: 225, y: 180, w: 90, h: 90},
+      {x: 1035, y: 180, w: 90, h: 90},
+      {x: 225, y: 630, w: 90, h: 90},
+      {x: 1035, y: 630, w: 90, h: 90},
+      {x: 630, y: 405, w: 90, h: 90},
+      {x: 630, y: 135, w: 90, h: 60},
+      {x: 630, y: 705, w: 90, h: 60},
+      {x: 100, y: 405, w: 60, h: 90},
+      {x: 1190, y: 405, w: 60, h: 90},
+      {x: 400, y: 300, w: 50, h: 50},
+      {x: 900, y: 300, w: 50, h: 50},
+      {x: 400, y: 550, w: 50, h: 50},
+      {x: 900, y: 550, w: 50, h: 50}
+    ]
+  },
+  diagonal: {
+    name: 'Diagonal Divide',
+    walls: [
+      {x: 150, y: 120, w: 240, h: 45},
+      {x: 420, y: 270, w: 240, h: 45},
+      {x: 690, y: 420, w: 240, h: 45},
+      {x: 960, y: 570, w: 240, h: 45},
+      {x: 960, y: 120, w: 45, h: 210},
+      {x: 345, y: 570, w: 45, h: 210},
+      {x: 1100, y: 120, w: 150, h: 30},
+      {x: 100, y: 750, w: 150, h: 30},
+      {x: 550, y: 550, w: 50, h: 50},
+      {x: 800, y: 250, w: 50, h: 50},
+      {x: 250, y: 450, w: 50, h: 50},
+      {x: 1050, y: 450, w: 50, h: 50}
+    ]
+  },
+  fortress: {
+    name: 'Fortress',
+    walls: [
+      {x: 375, y: 225, w: 600, h: 30},
+      {x: 375, y: 645, w: 600, h: 30},
+      {x: 375, y: 225, w: 30, h: 135},
+      {x: 375, y: 540, w: 30, h: 135},
+      {x: 945, y: 225, w: 30, h: 135},
+      {x: 945, y: 540, w: 30, h: 135},
+      {x: 645, y: 405, w: 60, h: 90},
+      {x: 225, y: 225, w: 60, h: 60},
+      {x: 1065, y: 225, w: 60, h: 60},
+      {x: 225, y: 615, w: 60, h: 60},
+      {x: 1065, y: 615, w: 60, h: 60},
+      {x: 300, y: 405, w: 40, h: 40},
+      {x: 1010, y: 405, w: 40, h: 40},
+      {x: 645, y: 280, w: 60, h: 30},
+      {x: 645, y: 590, w: 60, h: 30}
+    ]
+  },
+  arena2: {
+    name: 'Quad Rooms',
+    walls: [
+      {x: 660, y: 0, w: 30, h: 330},
+      {x: 660, y: 570, w: 30, h: 330},
+      {x: 0, y: 435, w: 330, h: 30},
+      {x: 1020, y: 435, w: 330, h: 30},
+      {x: 540, y: 405, w: 270, h: 90},
+      {x: 200, y: 150, w: 60, h: 60},
+      {x: 1090, y: 150, w: 60, h: 60},
+      {x: 200, y: 690, w: 60, h: 60},
+      {x: 1090, y: 690, w: 60, h: 60},
+      {x: 330, y: 600, w: 50, h: 50},
+      {x: 970, y: 600, w: 50, h: 50},
+      {x: 330, y: 250, w: 50, h: 50},
+      {x: 970, y: 250, w: 50, h: 50}
+    ]
+  },
+  bridge: {
+    name: 'Bridge',
+    walls: [
+      {x: 375, y: 0, w: 600, h: 345},
+      {x: 375, y: 555, w: 600, h: 345},
+      {x: 120, y: 405, w: 60, h: 90},
+      {x: 1170, y: 405, w: 60, h: 90},
+      {x: 250, y: 420, w: 50, h: 60},
+      {x: 1050, y: 420, w: 50, h: 60},
+      {x: 660, y: 405, w: 30, h: 90}
+    ]
+  },
+  spiral: {
+    name: 'Spiral',
+    walls: [
+      {x: 150, y: 150, w: 900, h: 30},
+      {x: 150, y: 150, w: 30, h: 450},
+      {x: 150, y: 720, w: 750, h: 30},
+      {x: 870, y: 300, w: 30, h: 450},
+      {x: 390, y: 360, w: 480, h: 30},
+      {x: 390, y: 360, w: 30, h: 240},
+      {x: 600, y: 480, w: 30, h: 120},
+      {x: 220, y: 220, w: 50, h: 50},
+      {x: 1020, y: 600, w: 50, h: 50},
+      {x: 720, y: 620, w: 50, h: 50}
+    ]
+  },
+  islands: {
+    name: 'Islands',
+    walls: [
+      {x: 225, y: 120, w: 195, h: 135},
+      {x: 930, y: 120, w: 195, h: 135},
+      {x: 225, y: 645, w: 195, h: 135},
+      {x: 930, y: 645, w: 195, h: 135},
+      {x: 578, y: 383, w: 195, h: 135},
+      {x: 75, y: 382, w: 120, h: 135},
+      {x: 1155, y: 382, w: 120, h: 135},
+      {x: 675, y: 150, w: 50, h: 50},
+      {x: 675, y: 650, w: 50, h: 50},
+      {x: 450, y: 250, w: 40, h: 40},
+      {x: 850, y: 250, w: 40, h: 40}
+    ]
+  },
+  building: {
+    name: 'Building',
+    walls: [
+      // outer perimeter
+      {x: 60, y: 60, w: 1230, h: 20},
+      {x: 60, y: 820, w: 1230, h: 20},
+      {x: 60, y: 60, w: 20, h: 780},
+      {x: 1270, y: 60, w: 20, h: 780},
+      // internal vertical walls (x=470 and x=880) with doorway gaps per row
+      {x: 470, y: 60, w: 20, h: 90},
+      {x: 470, y: 230, w: 20, h: 180},
+      {x: 470, y: 490, w: 20, h: 180},
+      {x: 470, y: 750, w: 20, h: 90},
+      {x: 880, y: 60, w: 20, h: 90},
+      {x: 880, y: 230, w: 20, h: 180},
+      {x: 880, y: 490, w: 20, h: 180},
+      {x: 880, y: 750, w: 20, h: 90},
+      // internal horizontal walls (y=320 and y=580) with doorway gaps per column
+      {x: 60, y: 320, w: 165, h: 20},
+      {x: 305, y: 320, w: 330, h: 20},
+      {x: 715, y: 320, w: 330, h: 20},
+      {x: 1125, y: 320, w: 165, h: 20},
+      {x: 60, y: 580, w: 165, h: 20},
+      {x: 305, y: 580, w: 330, h: 20},
+      {x: 715, y: 580, w: 330, h: 20},
+      {x: 1125, y: 580, w: 165, h: 20},
+      // furniture/pillars scattered through a few rooms
+      {x: 645, y: 420, w: 60, h: 60},
+      {x: 1040, y: 150, w: 50, h: 50},
+      {x: 230, y: 670, w: 50, h: 50},
+      {x: 650, y: 160, w: 50, h: 50}
+    ]
+  }
+};
+
+// ---------- Game state ----------
+let players, bullets, swings, particles, groundFires, traps, minions, walls, keys, lastTime, running, fogOfWar;
+let CHOKEPOINTS = [];
+let vsAIMode = false;
+let cameraZoomEnabled = false;
+let mouseAimMode = false;
+let humanCount = 1;
+let mouseX = CANVAS_W / 2, mouseY = CANVAS_H / 2;
+let mouseDown = false;
+
+// nudges any player who spawned clipped into a wall outward until they're clear of it
+function resolveSpawnCollisions() {
+  for (const p of players) {
+    for (let iter = 0; iter < 200; iter++) {
+      let collidedWall = null;
+      for (const w of walls) {
+        if (circleRectCollide(p.x, p.y, p.radius, w)) { collidedWall = w; break; }
+      }
+      if (!collidedWall) break;
+
+      const rectCx = collidedWall.x + collidedWall.w / 2;
+      const rectCy = collidedWall.y + collidedWall.h / 2;
+      let dx = p.x - rectCx, dy = p.y - rectCy;
+      if (dx === 0 && dy === 0) { dx = CANVAS_W / 2 - rectCx; dy = CANVAS_H / 2 - rectCy; }
+      const len = Math.hypot(dx, dy) || 1;
+      p.x += (dx / len) * 2;
+      p.y += (dy / len) * 2;
+      p.x = Math.max(p.radius, Math.min(CANVAS_W - p.radius, p.x));
+      p.y = Math.max(p.radius, Math.min(CANVAS_H - p.radius, p.y));
+    }
+  }
+}
+
+function circleRectCollide(cx, cy, r, rect) {
+  const closestX = Math.max(rect.x, Math.min(cx, rect.x + rect.w));
+  const closestY = Math.max(rect.y, Math.min(cy, rect.y + rect.h));
+  const dx = cx - closestX, dy = cy - closestY;
+  return (dx*dx + dy*dy) < r*r;
+}
+
+function pointInRect(px, py, rect) {
+  return px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h;
+}
+
+// casts a short ray from (x,y) in direction (dx,dy) and returns the distance to the
+// nearest wall or map edge, capped at `max` - used to find narrow corridors/chokepoints
+function rayDist(x, y, dx, dy, max) {
+  for (let d = 10; d <= max; d += 10) {
+    const px = x + dx * d, py = y + dy * d;
+    if (px < 0 || px > CANVAS_W || py < 0 || py > CANVAS_H) return d;
+    for (const w of walls) {
+      if (pointInRect(px, py, w)) return d;
+    }
+  }
+  return max;
+}
+
+// finds narrow corridor/doorway points on the current map - used by Trap Layer AI to
+// decide where to lay bear traps so they catch opponents passing through
+function computeChokepoints() {
+  const pts = [];
+  const step = 60, probe = 140, gapLimit = 160;
+  for (let y = step; y < CANVAS_H; y += step) {
+    for (let x = step; x < CANVAS_W; x += step) {
+      let blocked = false;
+      for (const w of walls) {
+        if (circleRectCollide(x, y, 20, w)) { blocked = true; break; }
+      }
+      if (blocked) continue;
+      const horizGap = rayDist(x, y, -1, 0, probe) + rayDist(x, y, 1, 0, probe);
+      const vertGap = rayDist(x, y, 0, -1, probe) + rayDist(x, y, 0, 1, probe);
+      if (horizGap < gapLimit || vertGap < gapLimit) {
+        pts.push({ x, y });
+      }
+    }
+  }
+  return pts;
+}
+
+function pointSegmentDist(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  let t = lenSq > 0 ? ((px - x1) * dx + (py - y1) * dy) / lenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t * dx, cy = y1 + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+
+// returns true if segment (x1,y1)-(x2,y2) intersects segment (x3,y3)-(x4,y4)
+function segmentsIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+  const d1x = x2 - x1, d1y = y2 - y1;
+  const d2x = x4 - x3, d2y = y4 - y3;
+  const denom = d1x * d2y - d1y * d2x;
+  if (denom === 0) return false;
+  const t = ((x3 - x1) * d2y - (y3 - y1) * d2x) / denom;
+  const u = ((x3 - x1) * d1y - (y3 - y1) * d1x) / denom;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+}
+
+// rotate `current` towards `target` by at most `maxDelta` radians, taking the shortest path around the circle
+function smoothAngle(current, target, maxDelta) {
+  let diff = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  diff = Math.max(-maxDelta, Math.min(maxDelta, diff));
+  return current + diff;
+}
+
+function createPlayer(classId, perkIds, x, y, color, controls, isAI, difficultyId) {
+  // deep clone so perk modifiers don't leak between players/games
+  const cls = JSON.parse(JSON.stringify(CLASSES[classId]));
+  const perks = perkIds.map(id => PERKS[id] || PERKS.none).filter(p => p !== PERKS.none);
+
+  let regenPerSec = 0;
+  let turrets = [];
+  for (const perk of perks) {
+    if (perk.speedMult) cls.speed *= perk.speedMult;
+    if (perk.hpMult) cls.hp = Math.round(cls.hp * perk.hpMult);
+    if (perk.bulletSpeedMult && cls.weapon.speed) cls.weapon.speed *= perk.bulletSpeedMult;
+    if (perk.regenPerSec) regenPerSec += perk.regenPerSec;
+    if (perk.turret) turrets.push({ type: perk.turret, lastShot: 0 });
+    if (perk.rangeMult && cls.weapon.range) cls.weapon.range *= perk.rangeMult;
+    if (perk.cooldownMult && cls.weapon.cooldown) cls.weapon.cooldown = Math.round(cls.weapon.cooldown * perk.cooldownMult);
+  }
+
+  return {
+    classId, cls, perks,
+    x, y, radius: cls.radius,
+    hp: cls.hp, maxHp: cls.hp,
+    angle: 0,
+    vx: 0, vy: 0,
+    moving: false,
+    lastShot: 0,
+    alive: true,
+    color,
+    controls,
+    flameHeld: false,
+    burns: [],
+    regenAccum: 0,
+    regenPerSec,
+    isAI: !!isAI,
+    difficulty: AI_DIFFICULTIES[difficultyId] || AI_DIFFICULTIES.medium,
+    aiStrafeDir: Math.random() < 0.5 ? 1 : -1,
+    aiStrafeTimer: 0,
+    aiSeenTimer: 0,
+    scoutTarget: null,
+    walkPhase: 0,
+    campPos: { x, y },
+    campTimer: 0,
+    isCamping: false,
+    slowTimer: 0,
+    slowMult: 1,
+    poisonStacks: 0,
+    turrets,
+    shootBlockTimer: 0,
+    knockbackVx: 0,
+    knockbackVy: 0,
+    traps: cls.trap ? cls.trap.startCount : 0,
+    trapRegenAccum: 0,
+    trapKeyHeld: false,
+    trapDropTimer: 0,
+    dashTimer: 0,
+    dashAngle: 0,
+    dashHitSet: new Set(),
+    trapIndicatorTimer: 0,
+    scrap: 0,
+    scrapAccum: 0,
+    abilityTimer: 0,
+    abilityActive: false,
+    abilityActiveTimer: 0,
+    homingReady: false,
+    _napalmAccum: 0
+  };
+}
+
+// corner spawn points that stay clear of walls on every map
+const SPAWN_POINTS = [
+  { x: 120, y: 120, angle: -Math.PI * 3/4 },
+  { x: CANVAS_W - 120, y: CANVAS_H - 120, angle: Math.PI / 4 },
+  { x: CANVAS_W - 120, y: 120, angle: Math.PI * 3/4 },
+  { x: 120, y: CANVAS_H - 120, angle: -Math.PI / 4 },
+  { x: CANVAS_W / 2, y: CANVAS_H - 120, angle: -Math.PI / 2 }
+];
+const AI_COLORS = ['#e74c3c', '#f1c40f', '#9b59b6'];
+// when Player 2 is human (PvP or co-op), they spawn right next to Player 1 instead of across the map
+const P2_NEAR_SPAWN = { x: SPAWN_POINTS[0].x + 135, y: SPAWN_POINTS[0].y, angle: SPAWN_POINTS[0].angle };
+
+function setupGame(mapId, p1Class, p2Class, p1Perks, p2Perks, p1AI, p2AI, p1Difficulty, p2Difficulty, numAI, fogOfWarEnabled, coopMode, aiClass, aiPerks, aiDifficulty) {
+  walls = MAPS[mapId].walls.map(w => ({...w}));
+  bullets = [];
+  swings = [];
+  particles = [];
+  groundFires = [];
+  traps = [];
+  minions = [];
+  keys = {};
+  CHOKEPOINTS = computeChokepoints();
+
+  const aiCount = Math.max(1, numAI || 1);
+  const p1Controls = { up: 'w', down: 's', left: 'a', right: 'd', fire: ' ', trap: 'e', ability: 'q' };
+  const p2Controls = { up: 'arrowup', down: 'arrowdown', left: 'arrowleft', right: 'arrowright', fire: '/', trap: '.', ability: ',' };
+
+  players = [
+    createPlayer(p1Class, p1Perks, SPAWN_POINTS[0].x, SPAWN_POINTS[0].y, '#3498db', p1Controls, coopMode ? false : p1AI, p1Difficulty)
+  ];
+  players[0].angle = SPAWN_POINTS[0].angle;
+  players[0].label = 'Player 1';
+
+  if (coopMode) {
+    // Player 2 is a second human teammate, spawning right next to Player 1; AI opponents fill the remaining spawn points
+    const p2 = createPlayer(p2Class, p2Perks, P2_NEAR_SPAWN.x, P2_NEAR_SPAWN.y, '#2ecc71', p2Controls, false, p2Difficulty);
+    p2.angle = P2_NEAR_SPAWN.angle;
+    p2.label = 'Player 2';
+    players.push(p2);
+
+    for (let i = 0; i < aiCount; i++) {
+      const sp = SPAWN_POINTS[(i + 2) % SPAWN_POINTS.length];
+      const ai = createPlayer(aiClass, aiPerks, sp.x, sp.y, AI_COLORS[i % AI_COLORS.length], p2Controls, true, aiDifficulty);
+      ai.angle = sp.angle;
+      ai.label = `AI ${i + 1}`;
+      players.push(ai);
+    }
+    humanCount = 2;
+  } else {
+    // P2's slot becomes AI automatically if more than one AI opponent is requested
+    for (let i = 0; i < aiCount; i++) {
+      const isAI = aiCount > 1 || p2AI;
+      // outside co-op, P1 and P2 (human or AI) spawn on opposite sides of the map
+      const sp = SPAWN_POINTS[(i + 1) % SPAWN_POINTS.length];
+      const color = aiCount > 1 ? AI_COLORS[i % AI_COLORS.length] : '#e74c3c';
+      const p = createPlayer(p2Class, p2Perks, sp.x, sp.y, color, p2Controls, isAI, p2Difficulty);
+      p.angle = sp.angle;
+      p.label = aiCount > 1 ? `AI ${i + 1}` : 'Player 2';
+      players.push(p);
+    }
+    humanCount = 1;
+  }
+
+  // make sure nobody spawned clipped into a wall (e.g. overlapping spawn points on some maps)
+  resolveSpawnCollisions();
+
+  // when there's exactly one human facing AI, they aim with the mouse cursor
+  // instead of their movement direction, to offset the AI's strafing.
+  // co-op players both use keyboard movement-direction aiming, like PvP.
+  vsAIMode = players.some(p => p.isAI);
+  mouseAimMode = vsAIMode && humanCount === 1;
+
+  // fog of war only matters when an AI needs to be kept in the dark - irrelevant in pure PvP
+  fogOfWar = !!fogOfWarEnabled && vsAIMode;
+
+  const perkLabel = (perks) => perks.length ? ` (${perks.map(p => p.label).join(', ')})` : '';
+  const aiLabel = (player) => player.isAI ? ` [AI - ${player.difficulty.label}]` : '';
+
+  const hud = document.getElementById('hud');
+  hud.innerHTML = '';
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i];
+    const entry = document.createElement('div');
+    entry.className = 'hud-entry';
+    if (i > 0) entry.style.textAlign = 'right';
+    entry.innerHTML = `
+      <div id="label-${i}">${p.label} - ${p.cls.label}${perkLabel(p.perks)}${aiLabel(p)}</div>
+      <div class="hpbar"><div id="hp-${i}" class="hpfill" style="width:100%; background:${p.color};"></div></div>
+    `;
+    hud.appendChild(entry);
+  }
+  updateHpBars();
+}
+
+function updateHpBars() {
+  for (let i = 0; i < players.length; i++) {
+    const pct = Math.max(0, players[i].hp / players[i].maxHp) * 100;
+    const bar = document.getElementById('hp-' + i);
+    if (bar) bar.style.width = pct + '%';
+  }
+}
+
+// players[0..humanCount-1] are the human team; everyone else is the AI team
+function isHumanPlayer(player) {
+  if (player.isMinion) return player.team;
+  return players.indexOf(player) < humanCount;
+}
+
+// returns the closest living opponent on the other team to the given player, or null if none remain
+function findNearestEnemy(player) {
+  let best = null, bestDist = Infinity;
+  const playerIsHuman = isHumanPlayer(player);
+  for (const p of players) {
+    if (p === player || !p.alive) continue;
+    if (isHumanPlayer(p) === playerIsHuman) continue; // skip teammates
+    const d = Math.hypot(p.x - player.x, p.y - player.y);
+    if (d < bestDist) { bestDist = d; best = p; }
+  }
+  return best;
+}
+
+// AI opponents target the nearest human; humans target the nearest AI
+function getTarget(player) {
+  return findNearestEnemy(player);
+}
+
+// ---------- Movement & collision ----------
+function tryMove(player, dx, dy) {
+  const newX = player.x + dx;
+  const newY = player.y + dy;
+
+  // X axis
+  let blockedX = false;
+  if (newX - player.radius < 0 || newX + player.radius > CANVAS_W) blockedX = true;
+  for (const w of walls) {
+    if (circleRectCollide(newX, player.y, player.radius, w)) { blockedX = true; break; }
+  }
+  if (!blockedX) player.x = newX;
+
+  // Y axis
+  let blockedY = false;
+  if (newY - player.radius < 0 || newY + player.radius > CANVAS_H) blockedY = true;
+  for (const w of walls) {
+    if (circleRectCollide(player.x, newY, player.radius, w)) { blockedY = true; break; }
+  }
+  if (!blockedY) player.y = newY;
+}
+
+// moves a player ignoring walls entirely - used by the ninja's dash, which tears straight
+// through obstacles - still clamped to the arena bounds
+function moveIgnoringWalls(player, dx, dy) {
+  player.x = Math.min(CANVAS_W - player.radius, Math.max(player.radius, player.x + dx));
+  player.y = Math.min(CANVAS_H - player.radius, Math.max(player.radius, player.y + dy));
+}
+
+// applies a knockback impulse that decelerates over subsequent frames (fast then slowing to a stop)
+function applyKnockback(target, angle, force) {
+  target.knockbackVx += Math.cos(angle) * force;
+  target.knockbackVy += Math.sin(angle) * force;
+}
+
+// scatters a ring of small, fast, short-range shrapnel bullets from a cannonball impact
+function spawnShrapnel(x, y, owner) {
+  const count = 12;
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2 + Math.random() * 0.3;
+    bullets.push({
+      x, y,
+      vx: Math.cos(a) * (10 + Math.random() * 4),
+      vy: Math.sin(a) * (10 + Math.random() * 4),
+      damage: 10,
+      size: 3,
+      range: 220,
+      traveled: 0,
+      owner,
+      type: 'bullet',
+      color: '#bdc3c7',
+      homing: 0,
+      poison: 0,
+      poisonDamage: 0
+    });
+  }
+}
+
+// drops an armed bear trap at (x,y). It stays armed indefinitely until an opponent steps on it,
+// but turns invisible 1 second after being placed (it's still live and will trigger as normal).
+function placeTrap(owner, x, y) {
+  const t = owner.cls.trap;
+  traps.push({ x, y, owner, damage: t.damage, triggerRadius: t.triggerRadius, stunDuration: t.stunDuration, slowMult: t.slowMult, hideTimer: 1000, hidden: false });
+}
+
+// deploys a stationary turret minion beside the sentry that built it - it tracks and
+// shoots the nearest enemy on its own until destroyed or its owner dies
+function spawnMinion(owner) {
+  const a = Math.random() * Math.PI * 2;
+  const radius = owner.cls.minion.radius;
+  minions.push({
+    isMinion: true,
+    team: isHumanPlayer(owner),
+    owner,
+    color: owner.color,
+    x: Math.min(CANVAS_W - radius, Math.max(radius, owner.x + Math.cos(a) * (owner.radius + 16))),
+    y: Math.min(CANVAS_H - radius, Math.max(radius, owner.y + Math.sin(a) * (owner.radius + 16))),
+    radius,
+    hp: owner.cls.minion.hp,
+    maxHp: owner.cls.minion.hp,
+    angle: 0,
+    lastShot: 0
+  });
+  for (let k = 0; k < 8; k++) {
+    particles.push({ x: owner.x, y: owner.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, life: 300, maxLife: 300, color: '#bdc3c7', size: 2 + Math.random() * 2 });
+  }
+}
+
+// ---------- Special abilities ----------
+function useAbility(player, now) {
+  const ab = player.cls.ability;
+  if (!ab) return;
+  const type = ab.type;
+
+  if (type === 'blastRing') {
+    // fire 20 heavy buckshot bullets in a full 360° ring
+    const w = player.cls.weapon;
+    const count = 12;
+    const ringSpeed = w.speed * 1.5;
+    const ringDamage = w.damage * 2.5;
+    const ringRange = w.range * 1.4;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      bullets.push({
+        x: player.x + Math.cos(a) * (player.radius + 2),
+        y: player.y + Math.sin(a) * (player.radius + 2),
+        vx: Math.cos(a) * ringSpeed,
+        vy: Math.sin(a) * ringSpeed,
+        damage: ringDamage,
+        size: w.size * 1.5,
+        range: ringRange,
+        traveled: 0,
+        owner: player,
+        type: 'bullet',
+        color: player.color,
+        homing: 0,
+        poison: 0,
+        poisonDamage: 0,
+        knockback: 12,
+        slowMult: undefined,
+        slowDuration: undefined,
+        fireRadius: 0,
+        fireDuration: 0,
+        burnDamage: 0,
+        explosionDamage: 0,
+        impactBurst: false,
+        shredChance: 0,
+        dirAngle: a,
+        baseSpeed: ringSpeed,
+        baseSize: w.size * 1.5
+      });
+    }
+    // particle burst to sell the explosion
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2;
+      particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * (3 + Math.random() * 2), vy: Math.sin(a) * (3 + Math.random() * 2), life: 300, maxLife: 300, color: player.color, size: 4 + Math.random() * 3 });
+    }
+    player.abilityTimer = ab.cooldown;
+
+  } else if (type === 'overclock') {
+    player.abilityActive = true;
+    player.abilityActiveTimer = ab.duration || 2500;
+    player.abilityTimer = ab.cooldown;
+
+  } else if (type === 'homingShot') {
+    player.homingReady = true;
+    player.abilityTimer = ab.cooldown;
+
+  } else if (type === 'napalmTrail') {
+    player.abilityActive = true;
+    player.abilityActiveTimer = ab.duration || 3000;
+    player._napalmAccum = 0;
+    player.abilityTimer = ab.cooldown;
+
+  } else if (type === 'powerSlam') {
+    // ground slam: shockwave ring of 16 spikes that expand outward from the impact point
+    const spikeCount = 16;
+    const spikeSpeed = 7;
+    const spikeDamage = 8;
+    for (let i = 0; i < spikeCount; i++) {
+      const a = (i / spikeCount) * Math.PI * 2;
+      bullets.push({
+        x: player.x, y: player.y,
+        vx: Math.cos(a) * spikeSpeed,
+        vy: Math.sin(a) * spikeSpeed,
+        damage: spikeDamage,
+        size: 5,
+        range: 380,
+        traveled: 0,
+        owner: player,
+        type: 'bullet',
+        color: '#f1c40f',
+        homing: 0,
+        poison: 0, poisonDamage: 0,
+        knockback: 55,
+        slowMult: undefined, slowDuration: undefined,
+        fireRadius: 0, fireDuration: 0, burnDamage: 0,
+        explosionDamage: 0, impactBurst: false, shredChance: 0,
+        dirAngle: a, baseSpeed: spikeSpeed, baseSize: 5,
+        piercing: false, hitSet: null
+      });
+    }
+    // ground-slam impact particles
+    for (let k = 0; k < 20; k++) {
+      const a = Math.random() * Math.PI * 2;
+      const spd = 2 + Math.random() * 5;
+      particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life: 400, maxLife: 400, color: k % 2 === 0 ? '#f1c40f' : '#e67e22', size: 3 + Math.random() * 4 });
+    }
+    player.abilityTimer = ab.cooldown;
+
+  } else if (type === 'parry') {
+    player.abilityActive = true;
+    player.abilityActiveTimer = ab.duration || 400;
+    player.abilityTimer = ab.cooldown;
+    // visual flash of particles around the player
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      particles.push({ x: player.x + Math.cos(a) * player.radius, y: player.y + Math.sin(a) * player.radius, vx: Math.cos(a) * 2, vy: Math.sin(a) * 2, life: 300, maxLife: 300, color: '#9b59b6', size: 4 });
+    }
+
+  } else if (type === 'webBurst') {
+    // fire 5 nets in a spread cone — catches anything in front of the trapper
+    const w = player.cls.weapon;
+    const burstCount = 5;
+    const spreadArc = 0.9;
+    for (let i = 0; i < burstCount; i++) {
+      const a = player.angle + (i / (burstCount - 1) - 0.5) * spreadArc;
+      bullets.push({
+        x: player.x + Math.cos(player.angle) * (player.radius + 2),
+        y: player.y + Math.sin(player.angle) * (player.radius + 2),
+        vx: Math.cos(a) * w.speed,
+        vy: Math.sin(a) * w.speed,
+        damage: 0,
+        size: w.size * 1.3,
+        range: w.range,
+        traveled: 0,
+        owner: player,
+        type: 'net',
+        color: '#8e44ad',
+        homing: 0,
+        poison: 0, poisonDamage: 0,
+        knockback: 0,
+        slowMult: 0.15,
+        slowDuration: 4500,
+        fireRadius: 0, fireDuration: 0, burnDamage: 0,
+        explosionDamage: 0, impactBurst: false, shredChance: 0,
+        dirAngle: a, baseSpeed: w.speed, baseSize: w.size * 1.3,
+        piercing: false, hitSet: null
+      });
+    }
+    for (let k = 0; k < 10; k++) {
+      const a = player.angle + (Math.random() - 0.5) * spreadArc;
+      particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * (3 + Math.random() * 3), vy: Math.sin(a) * (3 + Math.random() * 3), life: 280, maxLife: 280, color: '#8e44ad', size: 3 + Math.random() * 2 });
+    }
+    player.abilityTimer = ab.cooldown;
+
+  } else if (type === 'trapBarrage') {
+    // two concentric rings of traps: 5 inner, 7 outer
+    const t = player.cls.trap;
+    const rings = [{ count: 5, radius: 65 }, { count: 7, radius: 130 }];
+    for (const ring of rings) {
+      for (let i = 0; i < ring.count; i++) {
+        const a = (i / ring.count) * Math.PI * 2;
+        const tx = Math.min(CANVAS_W - t.triggerRadius, Math.max(t.triggerRadius, player.x + Math.cos(a) * ring.radius));
+        const ty = Math.min(CANVAS_H - t.triggerRadius, Math.max(t.triggerRadius, player.y + Math.sin(a) * ring.radius));
+        traps.push({ x: tx, y: ty, owner: player, damage: t.damage, triggerRadius: t.triggerRadius, stunDuration: t.stunDuration, slowMult: t.slowMult, hideTimer: 800, hidden: false });
+      }
+    }
+    for (let k = 0; k < 10; k++) {
+      const a = Math.random() * Math.PI * 2;
+      particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * (2 + Math.random() * 3), vy: Math.sin(a) * (2 + Math.random() * 3), life: 300, maxLife: 300, color: '#16a085', size: 3 + Math.random() * 2 });
+    }
+    player.abilityTimer = ab.cooldown;
+  }
+}
+
+// ---------- Firing ----------
+function performMelee(player, now, damage, range, arc, knockback, shape, width, sweep) {
+  swings.push({ x: player.x, y: player.y, angle: player.angle, arc, range, width, shape: shape || 'arc', sweep: sweep || 0, life: 150, maxLife: 150, color: player.color });
+  for (const opp of players) {
+    if (opp === player || !opp.alive || isHumanPlayer(opp) === isHumanPlayer(player)) continue;
+    const dx = opp.x - player.x, dy = opp.y - player.y;
+    let hit = false;
+    if (shape === 'rect') {
+      // rotate the opponent into the player's facing frame and check a forward rectangle
+      const localX = dx * Math.cos(player.angle) + dy * Math.sin(player.angle);
+      const localY = -dx * Math.sin(player.angle) + dy * Math.cos(player.angle);
+      if (localX >= -opp.radius && localX <= range + opp.radius && Math.abs(localY) <= width / 2 + opp.radius) {
+        hit = true;
+      }
+    } else {
+      const dist = Math.hypot(dx, dy);
+      if (dist <= range + opp.radius) {
+        let angleTo = Math.atan2(dy, dx);
+        let diff = Math.atan2(Math.sin(angleTo - player.angle), Math.cos(angleTo - player.angle));
+        if (Math.abs(diff) <= arc / 2) hit = true;
+      }
+    }
+    if (hit) {
+      applyDamage(opp, damage);
+      if (knockback) {
+        applyKnockback(opp, player.angle, knockback);
+      }
+    }
+  }
+  // melee weapons can also smash enemy sentry minions
+  for (let mi = minions.length - 1; mi >= 0; mi--) {
+    const m = minions[mi];
+    if (m.team === isHumanPlayer(player)) continue;
+    const dx = m.x - player.x, dy = m.y - player.y;
+    let hit = false;
+    if (shape === 'rect') {
+      const localX = dx * Math.cos(player.angle) + dy * Math.sin(player.angle);
+      const localY = -dx * Math.sin(player.angle) + dy * Math.cos(player.angle);
+      if (localX >= -m.radius && localX <= range + m.radius && Math.abs(localY) <= width / 2 + m.radius) hit = true;
+    } else {
+      const dist = Math.hypot(dx, dy);
+      if (dist <= range + m.radius) {
+        let angleTo = Math.atan2(dy, dx);
+        let diff = Math.atan2(Math.sin(angleTo - player.angle), Math.cos(angleTo - player.angle));
+        if (Math.abs(diff) <= arc / 2) hit = true;
+      }
+    }
+    if (hit) {
+      m.hp -= damage;
+      for (let k = 0; k < 5; k++) {
+        particles.push({ x: m.x, y: m.y, vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2, life: 200, maxLife: 200, color: '#bdc3c7', size: 2 + Math.random() * 2 });
+      }
+      if (m.hp <= 0) {
+        for (let k = 0; k < 10; k++) {
+          particles.push({ x: m.x, y: m.y, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, life: 350, maxLife: 350, color: '#95a5a6', size: 3 + Math.random() * 3 });
+        }
+        minions.splice(mi, 1);
+      }
+    }
+  }
+}
+
+function fireWeapon(player, now) {
+  if (player.shootBlockTimer > 0) return;
+  const w = player.cls.weapon;
+  const opp = getTarget(player);
+  if (!opp) return;
+
+  if (w.type === 'melee') {
+    if (now - player.lastShot < w.cooldown) return;
+    player.lastShot = now;
+    performMelee(player, now, w.damage, w.range, w.arc, w.knockback || 0, w.shape, w.width, w.sweep);
+    return;
+  }
+
+  if (w.type === 'dash') {
+    if (player.dashTimer > 0) return;
+    if (now - player.lastShot < w.cooldown) return;
+    player.lastShot = now;
+    player.dashTimer = w.dashDuration;
+    player.dashAngle = player.angle;
+    player.dashHitSet.clear();
+    for (let k = 0; k < 8; k++) {
+      const a = player.angle + (Math.random() - 0.5) * 0.6;
+      particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * (2 + Math.random() * 2), vy: Math.sin(a) * (2 + Math.random() * 2), life: 200, maxLife: 200, color: '#ecf0f1', size: 2 + Math.random() * 2 });
+    }
+    return;
+  }
+
+  if (w.type === 'net') {
+    // close-quarters melee swing if the opponent is right next to the trapper
+    const dist = Math.hypot(opp.x - player.x, opp.y - player.y);
+    const inMeleeRange = dist <= w.meleeRange + opp.radius;
+    const cooldown = inMeleeRange ? w.meleeCooldown : w.cooldown;
+    if (now - player.lastShot < cooldown) return;
+    player.lastShot = now;
+
+    if (inMeleeRange) {
+      performMelee(player, now, w.meleeDamage, w.meleeRange, 1.3);
+      return;
+    }
+    // otherwise throw a net projectile (falls through to projectile spawn below)
+  } else {
+    const effectiveCooldown = (player.abilityActive && player.cls.ability?.type === 'overclock') ? w.cooldown / 3 : w.cooldown;
+    if (now - player.lastShot < effectiveCooldown) return;
+    player.lastShot = now;
+  }
+
+  // brawler: damage scales up as the player's own health drops
+  let damage = w.damage;
+  if (w.minDamage !== undefined) {
+    const missingFrac = 1 - player.hp / player.maxHp;
+    damage = w.minDamage + (w.maxDamage - w.minDamage) * missingFrac;
+  }
+
+  const isHoming = player.homingReady;
+  if (isHoming) player.homingReady = false;
+  for (let i = 0; i < w.pellets; i++) {
+    const spreadAngle = player.angle + (Math.random() - 0.5) * (w.spread || 0) * (w.pellets > 1 ? 1 : 2);
+    bullets.push({
+      x: player.x + Math.cos(player.angle) * (player.radius + 2),
+      y: player.y + Math.sin(player.angle) * (player.radius + 2),
+      vx: Math.cos(spreadAngle) * w.speed,
+      vy: Math.sin(spreadAngle) * w.speed,
+      damage: damage,
+      size: w.size,
+      range: w.range,
+      traveled: 0,
+      owner: player,
+      type: w.type,
+      color: player.color,
+      homing: isHoming ? 0.06 : (w.homing || 0),
+      poison: w.poison || 0,
+      poisonDamage: w.poisonDamage || 0,
+      knockback: w.knockback || 0,
+      slowMult: w.slowMult,
+      slowDuration: w.slowDuration,
+      fireRadius: w.fireRadius || 0,
+      fireDuration: w.fireDuration || 0,
+      burnDamage: w.burnDamage || 0,
+      explosionDamage: w.explosionDamage || 0,
+      impactBurst: w.impactBurst || false,
+      shredChance: w.shredChance || 0,
+      dirAngle: spreadAngle,
+      baseSpeed: w.speed,
+      baseSize: w.size,
+      piercing: false,
+      hitSet: null
+    });
+  }
+}
+
+// shoulder turret perks: auto-aim at the opponent and fire when they have line of sight.
+// each equipped turret (cannon/shotgun/tazer) has its own cooldown and stats
+function updateShoulderTurrets(player, now) {
+  if (!player.turrets.length) return;
+  if (player.shootBlockTimer > 0) return;
+  const opp = getTarget(player);
+  if (!opp) return;
+  const dist = Math.hypot(opp.x - player.x, opp.y - player.y);
+  const aimAngle = Math.atan2(opp.y - player.y, opp.x - player.x);
+
+  for (let i = 0; i < player.turrets.length; i++) {
+    const turret = player.turrets[i];
+    const spec = TURRET_TYPES[turret.type];
+    if (now - turret.lastShot < spec.cooldown) continue;
+    if (dist > spec.range) continue;
+    if (!hasLineOfSight(player.x, player.y, opp.x, opp.y)) continue;
+    turret.lastShot = now;
+
+    const side = player.turrets.length >= 2 ? (i === 0 ? -1 : 1) : -1;
+    const perpAngle = player.angle + Math.PI / 2 * side;
+    const ox = player.x + Math.cos(perpAngle) * player.radius * 0.75;
+    const oy = player.y + Math.sin(perpAngle) * player.radius * 0.75;
+
+    for (let p = 0; p < spec.pellets; p++) {
+      const a = aimAngle + (Math.random() - 0.5) * (spec.spread || 0);
+      bullets.push({
+        x: ox, y: oy,
+        vx: Math.cos(a) * spec.bulletSpeed,
+        vy: Math.sin(a) * spec.bulletSpeed,
+        damage: spec.damage,
+        size: 3,
+        range: spec.range,
+        traveled: 0,
+        owner: player,
+        type: 'bullet',
+        color: player.color,
+        homing: 0,
+        poison: 0,
+        poisonDamage: 0,
+        tazerSlowMult: spec.slowMult || 0,
+        tazerSlowDuration: spec.slowDuration || 0
+      });
+    }
+  }
+}
+
+function applyDamage(target, dmg) {
+  if (!target.alive) return;
+  if (target.dashTimer > 0) return; // ninja is invulnerable mid-dash
+  target.hp -= dmg;
+  if (target.hp <= 0) {
+    target.hp = 0;
+    target.alive = false;
+    if (isHumanPlayer(target)) {
+      const humansAlive = players.slice(0, humanCount).some(p => p.alive);
+      if (!humansAlive) {
+        // in pure PvP the "AI team" slot is actually Player 2, not an AI
+        endGame(vsAIMode ? null : players[1], vsAIMode ? 'AI Wins!' : undefined);
+      }
+    } else {
+      const aiAlive = players.slice(humanCount).some(p => p.alive);
+      if (!aiAlive) endGame(humanCount > 1 ? null : players[0], humanCount > 1 ? 'Players Win!' : undefined);
+    }
+  }
+  updateHpBars();
+}
+
+// ---------- AI ----------
+function hasLineOfSight(x1, y1, x2, y2) {
+  const dist = Math.hypot(x2 - x1, y2 - y1);
+  const steps = Math.ceil(dist / 8);
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const px = x1 + (x2 - x1) * t;
+    const py = y1 + (y2 - y1) * t;
+    for (const w of walls) {
+      if (pointInRect(px, py, w)) return false;
+    }
+  }
+  return true;
+}
+
+// checks incoming enemy projectiles for one on a near-future collision course with `ai`,
+// and returns a sideways dodge angle to step out of its path - or null if nothing to dodge
+function computeDodgeAngle(ai) {
+  for (const b of bullets) {
+    if (b.owner === ai || isHumanPlayer(b.owner) === isHumanPlayer(ai)) continue;
+    if (b.type === 'flame') continue; // flame is a wide continuous stream - dodging it is pointless
+    const speedSq = b.vx * b.vx + b.vy * b.vy;
+    if (speedSq < 0.01) continue;
+    const relX = ai.x - b.x, relY = ai.y - b.y;
+    const t = (relX * b.vx + relY * b.vy) / speedSq;
+    if (t < 0 || t > 16) continue; // only react to projectiles about to hit very soon
+    const closestX = b.x + b.vx * t, closestY = b.y + b.vy * t;
+    const distAtClosest = Math.hypot(ai.x - closestX, ai.y - closestY);
+    if (distAtClosest < ai.radius + b.size + 4) {
+      // step sideways, perpendicular to the bullet's path, toward whichever side
+      // already puts us farther from its line of travel
+      const perp = Math.atan2(b.vy, b.vx) + Math.PI / 2;
+      const cross = b.vx * relY - b.vy * relX;
+      return cross > 0 ? perp : perp + Math.PI;
+    }
+  }
+  return null;
+}
+
+// pick a random spot on the map (not inside a wall) for a scouting AI to wander toward
+function pickScoutTarget(ai) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const x = ai.radius + Math.random() * (CANVAS_W - ai.radius * 2);
+    const y = ai.radius + Math.random() * (CANVAS_H - ai.radius * 2);
+    let blocked = false;
+    for (const wall of walls) {
+      if (circleRectCollide(x, y, ai.radius, wall)) { blocked = true; break; }
+    }
+    if (!blocked) return { x, y };
+  }
+  return { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+}
+
+function updateAI(ai, now, dt) {
+  // Sentry AI: deploy a minion whenever it can afford one - no cap on minion count
+  if (ai.cls.minion) {
+    if (ai.scrap >= ai.cls.minion.cost) {
+      spawnMinion(ai);
+      ai.scrap -= ai.cls.minion.cost;
+    }
+  }
+
+  const opp = getTarget(ai);
+  if (!opp) return;
+
+  // AI ability usage
+  if (ai.cls.ability && ai.abilityTimer <= 0 && !ai.abilityActive) {
+    const dist = Math.hypot(opp.x - ai.x, opp.y - ai.y);
+    const type = ai.cls.ability.type;
+    if (type === 'blastRing' && dist < 350) useAbility(ai, now);
+    else if (type === 'overclock' && dist < 500) useAbility(ai, now);
+    else if (type === 'homingShot' && dist < 900) useAbility(ai, now);
+    else if (type === 'napalmTrail') useAbility(ai, now);
+    else if (type === 'powerSlam' && dist < 380) useAbility(ai, now);
+    else if (type === 'parry' && dist < 200) useAbility(ai, now);
+    else if (type === 'trapBarrage' && dist < 300) useAbility(ai, now);
+    else if (type === 'webBurst' && dist < 600) useAbility(ai, now);
+  }
+
+  const dx = opp.x - ai.x, dy = opp.y - ai.y;
+  const dist = Math.hypot(dx, dy);
+  const angleToOpp = Math.atan2(dy, dx);
+  const w = ai.cls.weapon;
+
+  // with fog of war on, the AI has no idea where the player is until it has direct line of sight.
+  // with the zoom camera on, the AI also can't "see" the player unless the AI itself is
+  // somewhere within the player's on-screen view - fair since the player can't see it either
+  const canSeePlayer = (!fogOfWar || hasLineOfSight(ai.x, ai.y, opp.x, opp.y)) && isInCameraView(ai.x, ai.y);
+
+  // medium/hard AI: try to sidestep incoming projectiles before anything else
+  let desiredAngle;
+  let seekingTrap = false;
+  let dodging = false;
+  // hard AI dodges fairly reliably; medium AI only reacts about a third of the time
+  if (ai.difficulty.aimError <= 0.03 || (ai.difficulty.aimError <= 0.15 && Math.random() < 0.33)) {
+    const dodgeAngle = computeDodgeAngle(ai);
+    if (dodgeAngle !== null) {
+      desiredAngle = dodgeAngle;
+      dodging = true;
+    }
+  }
+
+  // Ninja AI: only dash as a kill move when the opponent is in range and in a straight,
+  // unobstructed line - never as a general movement tool, and never to punch through a
+  // wall (that's a player-only trick).
+  if (!dodging && w.type === 'dash' && canSeePlayer && dist <= w.range && dist > ai.radius + opp.radius + 10
+      && hasLineOfSight(ai.x, ai.y, opp.x, opp.y)) {
+    ai.angle = angleToOpp;
+    fireWeapon(ai, now);
+    if (ai.dashTimer > 0) return; // dash fired - the dash branch in update() now drives movement
+  }
+
+  // Trap Layer AI: try to corner a visible, nearby opponent by ringing their open escape
+  // routes with traps; otherwise (opponent far away/unseen) pre-lay traps at chokepoints
+  if (dodging) {
+    // skip trap/movement decisions below - dodge takes priority
+  } else if (ai.cls.trap && ai.traps > 0 && canSeePlayer && dist > 50 && dist < 320) {
+    const ringRadius = 100;
+    const candidates = [];
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+      const px = opp.x + Math.cos(a) * ringRadius;
+      const py = opp.y + Math.sin(a) * ringRadius;
+      if (px < 24 || px > CANVAS_W - 24 || py < 24 || py > CANVAS_H - 24) continue;
+      let blocked = false;
+      for (const wall of walls) {
+        if (circleRectCollide(px, py, ai.radius, wall)) { blocked = true; break; }
+      }
+      if (blocked) continue;
+      if (traps.some(t => Math.hypot(t.x - px, t.y - py) < 45)) continue;
+      // only ring the sides the opponent could actually flee toward - an escape route
+      // is a direction they have a clear line of sight/movement along
+      if (!hasLineOfSight(opp.x, opp.y, px, py)) continue;
+      candidates.push({ x: px, y: py });
+    }
+    if (candidates.length) {
+      // close the nearest open escape route first
+      candidates.sort((a, b) => Math.hypot(a.x - ai.x, a.y - ai.y) - Math.hypot(b.x - ai.x, b.y - ai.y));
+      const target = candidates[0];
+      const tdist = Math.hypot(target.x - ai.x, target.y - ai.y);
+      if (tdist < 28) {
+        placeTrap(ai, ai.x, ai.y);
+        ai.traps--;
+      } else {
+        desiredAngle = Math.atan2(target.y - ai.y, target.x - ai.x);
+        seekingTrap = true;
+      }
+    }
+  } else if (ai.cls.trap && ai.traps > 0 && dist > 220) {
+    let target = null, targetDist = Infinity;
+    for (const cp of CHOKEPOINTS) {
+      if (traps.some(t => Math.hypot(t.x - cp.x, t.y - cp.y) < 50)) continue;
+      const d = Math.hypot(cp.x - ai.x, cp.y - ai.y);
+      if (d < targetDist) { targetDist = d; target = cp; }
+    }
+    if (target) {
+      if (targetDist < 28) {
+        placeTrap(ai, ai.x, ai.y);
+        ai.traps--;
+        ai.trapDropTimer = 0;
+      } else {
+        desiredAngle = Math.atan2(target.y - ai.y, target.x - ai.x);
+        seekingTrap = true;
+      }
+    } else {
+      // no good chokepoint left unguarded - occasionally just drop one underfoot
+      ai.trapDropTimer += dt;
+      if (ai.trapDropTimer > 4000) {
+        placeTrap(ai, ai.x, ai.y);
+        ai.traps--;
+        ai.trapDropTimer = 0;
+      }
+    }
+  }
+
+  // idle wandering: when the AI can't see anyone, it ambles toward a random spot, then
+  // stops to glance around for a bit before picking the next spot - rather than ceaselessly
+  // marching from point to point
+  let idling = false;
+  if (dodging) {
+    // fall through to obstacle avoidance below with the dodge angle already set
+  } else if (seekingTrap) {
+    // fall through to obstacle avoidance below with desiredAngle already set
+  } else if (!canSeePlayer) {
+    if (ai.idleTimer > 0) {
+      ai.idleTimer -= dt;
+      idling = true;
+      desiredAngle = ai.angle;
+      if (ai.idleTimer <= 0) ai.scoutTarget = pickScoutTarget(ai);
+    } else if (!ai.scoutTarget || Math.hypot(ai.scoutTarget.x - ai.x, ai.scoutTarget.y - ai.y) < 30) {
+      // reached (or never had) a destination - pause to glance around before wandering further
+      ai.idleTimer = 700 + Math.random() * 1800;
+      idling = true;
+      desiredAngle = ai.angle;
+    } else {
+      desiredAngle = Math.atan2(ai.scoutTarget.y - ai.y, ai.scoutTarget.x - ai.x);
+    }
+  } else {
+    ai.scoutTarget = null;
+    if (opp.isCamping || opp.slowTimer > 0) {
+      // the opponent is sitting still or tangled in a net - push in for the kill regardless of weapon
+      desiredAngle = angleToOpp;
+    } else {
+      // ideal engagement distance based on weapon type
+      let idealMin, idealMax;
+      if (w.type === 'melee' || w.type === 'dash') { idealMin = 0; idealMax = w.range * 0.8; }
+      else if (w.type === 'flame') { idealMin = 0; idealMax = w.range * 0.75; }
+      else if (w.type === 'net') { idealMin = 0; idealMax = w.range * 0.5; }
+      else if (w.range > 800) { idealMin = 350; idealMax = w.range * 0.9; } // sniper
+      else { idealMin = 150; idealMax = w.range * 0.7; }
+
+      // hysteresis around the ideal band: only switch approach/retreat/strafe modes once
+      // clearly past a threshold, otherwise dist hovering right at the boundary causes
+      // the AI to flip its desired direction every frame and spin/jitter in place
+      const margin = 40;
+      if (!ai.engageMode) ai.engageMode = 'strafe';
+      if (dist > idealMax + margin) ai.engageMode = 'approach';
+      else if (dist < idealMin - margin) ai.engageMode = 'retreat';
+      else if (dist <= idealMax && dist >= idealMin) ai.engageMode = 'strafe';
+      // (within the margin bands just outside [idealMin, idealMax], keep the current mode)
+
+      if (ai.engageMode === 'approach') {
+        desiredAngle = angleToOpp;
+      } else if (ai.engageMode === 'retreat') {
+        desiredAngle = angleToOpp + Math.PI;
+      } else {
+        // strafe perpendicular, occasionally flip direction
+        ai.aiStrafeTimer -= dt;
+        if (ai.aiStrafeTimer <= 0) {
+          ai.aiStrafeTimer = 800 + Math.random() * 1200;
+          if (Math.random() < 0.3) ai.aiStrafeDir *= -1;
+        }
+        desiredAngle = angleToOpp + (Math.PI / 2) * ai.aiStrafeDir;
+      }
+    }
+  }
+
+  // obstacle avoidance: test desired direction, fall back to nearby angles.
+  // when the desired angle is clear, prefer continuing with whatever offset we used last
+  // frame over snapping back to offset 0 - otherwise an AI hugging a wall corner can
+  // flip-flop between two offsets every frame and visibly jitter/spin in place.
+  const speed = ai.cls.speed * ai.slowMult;
+  const lookahead = ai.radius + speed * ai.difficulty.avoidLookaheadMult;
+  let tryAngles = [0, 0.4, -0.4, 0.8, -0.8, 1.4, -1.4, Math.PI];
+  if (ai.lastAvoidOffset) {
+    // keep offset 0 (the actual desired direction) as first choice, but otherwise
+    // prefer repeating last frame's detour over re-evaluating from scratch
+    tryAngles = [0, ai.lastAvoidOffset, ...tryAngles.filter(o => o !== 0 && o !== ai.lastAvoidOffset)];
+  }
+  let moveAngle = null;
+  for (const offset of tryAngles) {
+    const a = desiredAngle + offset;
+    const tx = ai.x + Math.cos(a) * lookahead;
+    const ty = ai.y + Math.sin(a) * lookahead;
+    if (tx < ai.radius || tx > CANVAS_W - ai.radius || ty < ai.radius || ty > CANVAS_H - ai.radius) continue;
+    let blocked = false;
+    for (const wall of walls) {
+      if (circleRectCollide(tx, ty, ai.radius, wall)) { blocked = true; break; }
+    }
+    if (!blocked) { moveAngle = a; ai.lastAvoidOffset = offset; break; }
+  }
+
+  if (idling) {
+    // standing still, slowly panning to glance around the area
+    ai.vx = 0;
+    ai.vy = 0;
+    ai.angle += dt * 0.0006;
+  } else if (moveAngle !== null) {
+    ai.vx = Math.cos(moveAngle) * speed;
+    ai.vy = Math.sin(moveAngle) * speed;
+    tryMove(ai, ai.vx, ai.vy);
+  } else {
+    ai.vx = 0;
+    ai.vy = 0;
+  }
+
+  if (!canSeePlayer) {
+    // face the direction it's scouting (or wherever it's currently glancing) rather than the unseen player
+    if (!idling && moveAngle !== null) ai.angle = moveAngle;
+    ai.aiSeenTimer = 0;
+    return;
+  }
+
+  // AI always aims at the opponent
+  ai.angle = angleToOpp;
+
+  // fire if in range and the opponent isn't hidden behind a wall,
+  // gated by difficulty: reaction delay before noticing the target,
+  // aim error on the shot, and a chance to actually pull the trigger
+  const targetVisible = dist <= w.range && hasLineOfSight(ai.x, ai.y, opp.x, opp.y);
+  if (targetVisible) {
+    ai.aiSeenTimer += dt;
+  } else {
+    ai.aiSeenTimer = 0;
+  }
+
+  if (targetVisible && ai.aiSeenTimer >= ai.difficulty.reactionDelay && Math.random() < ai.difficulty.fireChance) {
+    // lead the target: aim at where the opponent will be once the
+    // (slow-moving) projectile arrives, based on their current velocity
+    let aimAngle = angleToOpp;
+    if (w.speed) {
+      const travelFrames = Math.min(dist / w.speed, 90);
+      const predX = opp.x + opp.vx * travelFrames;
+      const predY = opp.y + opp.vy * travelFrames;
+      aimAngle = Math.atan2(predY - ai.y, predX - ai.x);
+    }
+    ai.angle = aimAngle + (Math.random() - 0.5) * 2 * ai.difficulty.aimError;
+    fireWeapon(ai, now);
+  }
+}
+
+// ---------- Update loop ----------
+function update(dt, now) {
+  computeCamera(dt);
+  for (const player of players) {
+    if (!player.alive) continue;
+
+    // tick fire debuff stacks (1 dmg/sec each, lasting 3s, can stack)
+    for (let i = player.burns.length - 1; i >= 0; i--) {
+      const burn = player.burns[i];
+      burn.timeLeft -= dt;
+      burn.nextTick -= dt;
+      if (burn.nextTick <= 0) {
+        burn.nextTick += 1000;
+        applyDamage(player, burn.dmg || 1);
+        if (!player.alive) break;
+      }
+      if (burn.timeLeft <= 0) player.burns.splice(i, 1);
+    }
+    if (!player.alive) continue;
+
+    // knockback: fast initial shove that decelerates to a stop
+    if (player.knockbackVx || player.knockbackVy) {
+      tryMove(player, player.knockbackVx, player.knockbackVy);
+      player.knockbackVx *= 0.88;
+      player.knockbackVy *= 0.88;
+      if (Math.abs(player.knockbackVx) < 0.15) player.knockbackVx = 0;
+      if (Math.abs(player.knockbackVy) < 0.15) player.knockbackVy = 0;
+    }
+
+    // health regen perk
+    if (player.regenPerSec && player.hp < player.maxHp) {
+      player.regenAccum += player.regenPerSec * dt / 1000;
+      if (player.regenAccum >= 1) {
+        const heal = Math.floor(player.regenAccum);
+        player.hp = Math.min(player.maxHp, player.hp + heal);
+        player.regenAccum -= heal;
+        updateHpBars();
+      }
+    }
+
+    // slow debuff from nets
+    if (player.slowTimer > 0) {
+      player.slowTimer -= dt;
+      if (player.slowTimer <= 0) {
+        player.slowTimer = 0;
+        player.slowMult = 1;
+      }
+    }
+
+    // can't shoot for a short time while tangled in a net
+    if (player.shootBlockTimer > 0) {
+      player.shootBlockTimer -= dt;
+      if (player.shootBlockTimer < 0) player.shootBlockTimer = 0;
+    }
+
+    // how much longer to show the off-screen "trapped" arrow for this player (zoom mode)
+    if (player.trapIndicatorTimer > 0) {
+      player.trapIndicatorTimer -= dt;
+      if (player.trapIndicatorTimer < 0) player.trapIndicatorTimer = 0;
+    }
+
+    // shoulder cannon perk: auto-aiming rapid-fire mini cannons
+    updateShoulderTurrets(player, now);
+
+    // sentry: passively collect scrap over time, spent to deploy turret minions
+    if (player.cls.scrapPerSec && player.scrap < player.cls.scrapMax) {
+      player.scrapAccum += player.cls.scrapPerSec * dt / 1000;
+      if (player.scrapAccum >= 1) {
+        const gained = Math.floor(player.scrapAccum);
+        player.scrap = Math.min(player.cls.scrapMax, player.scrap + gained);
+        player.scrapAccum -= gained;
+      }
+    }
+
+    // bear trap backpack: regenerate one trap every `regenInterval` ms, up to the max
+    if (player.cls.trap && player.traps < player.cls.trap.max) {
+      player.trapRegenAccum += dt;
+      if (player.trapRegenAccum >= player.cls.trap.regenInterval) {
+        player.trapRegenAccum -= player.cls.trap.regenInterval;
+        player.traps = Math.min(player.cls.trap.max, player.traps + 1);
+      }
+    }
+
+    // ability cooldown and active-duration countdown
+    if (player.abilityTimer > 0) player.abilityTimer -= dt;
+    if (player.abilityActive) {
+      player.abilityActiveTimer -= dt;
+      if (player.abilityActiveTimer <= 0) player.abilityActive = false;
+      // napalm trail: drop ground fire patches while moving
+      if (player.cls.ability?.type === 'napalmTrail' && (Math.hypot(player.vx, player.vy) > 0.1)) {
+        player._napalmAccum = (player._napalmAccum || 0) + dt;
+        if (player._napalmAccum >= 200) {
+          player._napalmAccum = 0;
+          const w = player.cls.weapon;
+          groundFires.push({ x: player.x, y: player.y, radius: w.fireRadius || 55, timeLeft: w.fireDuration || 3500, owner: player, burnDamage: w.burnDamage || 8, napalm: true });
+        }
+      }
+    }
+
+    if (player.dashTimer > 0) {
+      // ninja dash: a fast straight-line burst that slices any opponent it overlaps,
+      // hitting each one at most once per dash. Overrides normal movement/firing.
+      player.dashTimer -= dt;
+      if (player.dashTimer < 0) player.dashTimer = 0;
+      const dashSpeed = player.cls.weapon.dashSpeed;
+      player.vx = Math.cos(player.dashAngle) * dashSpeed;
+      player.vy = Math.sin(player.dashAngle) * dashSpeed;
+      player.angle = player.dashAngle;
+      if (player.isAI) {
+        // AI ninjas dash like a normal player movement burst - walls still block them
+        tryMove(player, player.vx, player.vy);
+      } else {
+        moveIgnoringWalls(player, player.vx, player.vy);
+      }
+      for (const opp of players) {
+        if (opp === player || !opp.alive || isHumanPlayer(opp) === isHumanPlayer(player)) continue;
+        if (player.dashHitSet.has(opp)) continue;
+        const d = Math.hypot(opp.x - player.x, opp.y - player.y);
+        if (d <= player.radius + opp.radius + 6) {
+          applyDamage(opp, player.cls.weapon.damage);
+          applyKnockback(opp, player.dashAngle, player.cls.weapon.knockback || 0);
+          player.dashHitSet.add(opp);
+          for (let k = 0; k < 6; k++) {
+            particles.push({ x: opp.x, y: opp.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, life: 220, maxLife: 220, color: '#ecf0f1', size: 2 + Math.random() * 2 });
+          }
+        }
+      }
+      // dash can also wreck enemy sentry minions in its path
+      for (let mi = minions.length - 1; mi >= 0; mi--) {
+        const m = minions[mi];
+        if (m.team === isHumanPlayer(player)) continue;
+        if (player.dashHitSet.has(m)) continue;
+        const d = Math.hypot(m.x - player.x, m.y - player.y);
+        if (d <= player.radius + m.radius + 6) {
+          m.hp -= player.cls.weapon.damage;
+          player.dashHitSet.add(m);
+          for (let k = 0; k < 5; k++) {
+            particles.push({ x: m.x, y: m.y, vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2, life: 200, maxLife: 200, color: '#bdc3c7', size: 2 + Math.random() * 2 });
+          }
+          if (m.hp <= 0) {
+            for (let k = 0; k < 10; k++) {
+              particles.push({ x: m.x, y: m.y, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, life: 350, maxLife: 350, color: '#95a5a6', size: 3 + Math.random() * 3 });
+            }
+            minions.splice(mi, 1);
+          }
+        }
+      }
+      // if the dash timer ran out but the ninja tore into a wall and is still inside it,
+      // keep dashing for another tick so it always emerges on the far side
+      if (player.dashTimer <= 0) {
+        player.dashTimer = 0;
+        for (const w of walls) {
+          if (circleRectCollide(player.x, player.y, player.radius, w)) {
+            player.dashTimer = dt;
+            break;
+          }
+        }
+      }
+    } else if (player.isAI) {
+      updateAI(player, now, dt);
+    } else {
+      const c = player.controls;
+      let dx = 0, dy = 0;
+      if (keys[c.up]) dy -= 1;
+      if (keys[c.down]) dy += 1;
+      if (keys[c.left]) dx -= 1;
+      if (keys[c.right]) dx += 1;
+
+      if (dx !== 0 || dy !== 0) {
+        const len = Math.hypot(dx, dy);
+        dx /= len; dy /= len;
+        if (!mouseAimMode) player.angle = smoothAngle(player.angle, Math.atan2(dy, dx), dt * 0.012);
+        const speed = player.cls.speed * player.slowMult;
+        player.vx = dx * speed;
+        player.vy = dy * speed;
+        tryMove(player, player.vx, player.vy);
+      } else {
+        player.vx = 0;
+        player.vy = 0;
+      }
+
+      if (mouseAimMode) {
+        const aim = screenToWorld(mouseX, mouseY);
+        player.angle = Math.atan2(aim.y - player.y, aim.x - player.x);
+      }
+
+      if (mouseAimMode ? mouseDown : keys[c.fire]) {
+        fireWeapon(player, now);
+      }
+
+      // bear trap placement: drop a trap underfoot, edge-triggered so holding the key doesn't spam
+      if (player.cls.trap) {
+        if (keys[c.trap] && !player.trapKeyHeld) {
+          if (player.traps > 0) {
+            placeTrap(player, player.x, player.y);
+            player.traps--;
+          }
+          player.trapKeyHeld = true;
+        } else if (!keys[c.trap]) {
+          player.trapKeyHeld = false;
+        }
+      }
+
+      // sentry: build a minion, edge-triggered so holding the key doesn't spam - no cap on count
+      if (player.cls.minion) {
+        if (keys[c.trap] && !player.trapKeyHeld) {
+          if (player.scrap >= player.cls.minion.cost) {
+            spawnMinion(player);
+            player.scrap -= player.cls.minion.cost;
+          }
+          player.trapKeyHeld = true;
+        } else if (!keys[c.trap]) {
+          player.trapKeyHeld = false;
+        }
+      }
+
+      // special ability: Q/comma key for trap layer (which already uses E/. for individual traps),
+      // or E/. key for all other ability classes
+      if (player.cls.ability) {
+        const usesTrapKey = player.cls.trap; // trap layer uses its own trap key for single drops
+        const abilityKey = usesTrapKey ? c.ability : c.trap;
+        const heldFlag = usesTrapKey ? '_abilityKeyHeld' : 'trapKeyHeld';
+        if (keys[abilityKey] && !player[heldFlag]) {
+          if (player.abilityTimer <= 0 && !player.abilityActive) {
+            useAbility(player, now);
+          }
+          player[heldFlag] = true;
+        } else if (!keys[abilityKey]) {
+          player[heldFlag] = false;
+        }
+      }
+    }
+
+    // walking animation: advance leg-swing phase based on movement speed
+    const moveSpeed = Math.hypot(player.vx, player.vy);
+    if (moveSpeed > 0.01) {
+      player.walkPhase += dt * 0.018 * moveSpeed;
+    }
+
+    // camping detection: has this player barely moved over the last second?
+    player.campTimer += dt;
+    if (player.campTimer >= 1000) {
+      const moved = Math.hypot(player.x - player.campPos.x, player.y - player.campPos.y);
+      player.isCamping = moved < 25;
+      player.campPos = { x: player.x, y: player.y };
+      player.campTimer = 0;
+    }
+  }
+
+  // update sentry minions: stationary turrets that track and fire at the nearest
+  // enemy in range, and disappear if their owner dies
+  for (let i = minions.length - 1; i >= 0; i--) {
+    const m = minions[i];
+    if (!m.owner.alive) { minions.splice(i, 1); continue; }
+    let target = null, targetDist = Infinity;
+    for (const p of players) {
+      if (!p.alive || isHumanPlayer(p) === m.team) continue;
+      const d = Math.hypot(p.x - m.x, p.y - m.y);
+      if (d < targetDist) { targetDist = d; target = p; }
+    }
+    const spec = m.owner.cls.minion;
+    if (target && targetDist <= spec.range && hasLineOfSight(m.x, m.y, target.x, target.y)) {
+      m.angle = Math.atan2(target.y - m.y, target.x - m.x);
+      if (now - m.lastShot >= spec.cooldown) {
+        m.lastShot = now;
+        bullets.push({
+          x: m.x + Math.cos(m.angle) * (m.radius + 2),
+          y: m.y + Math.sin(m.angle) * (m.radius + 2),
+          vx: Math.cos(m.angle) * spec.bulletSpeed,
+          vy: Math.sin(m.angle) * spec.bulletSpeed,
+          damage: spec.damage,
+          size: 3,
+          range: spec.range,
+          traveled: 0,
+          owner: m,
+          type: 'bullet',
+          color: m.color,
+          homing: 0,
+          poison: 0,
+          poisonDamage: 0
+        });
+      }
+    }
+  }
+
+  // sprayer rounds have a chance to shoot down an enemy projectile they collide with,
+  // destroying both bullets in a small spark burst
+  {
+    const shredded = new Set();
+    for (const b of bullets) {
+      if (!b.shredChance || shredded.has(b)) continue;
+      for (const o of bullets) {
+        if (o === b || shredded.has(o)) continue;
+        if (isHumanPlayer(o.owner) === isHumanPlayer(b.owner)) continue;
+        const d = Math.hypot(b.x - o.x, b.y - o.y);
+        if (d < b.size + o.size + 4 && Math.random() < b.shredChance) {
+          shredded.add(b);
+          shredded.add(o);
+          for (let k = 0; k < 6; k++) {
+            particles.push({ x: o.x, y: o.y, vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2, life: 200, maxLife: 200, color: '#fff', size: 2 + Math.random() * 2 });
+          }
+          break;
+        }
+      }
+    }
+    if (shredded.size) bullets = bullets.filter(b => !shredded.has(b));
+  }
+
+  // update bullets
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+
+    // homing: gently steer toward the opponent
+    if (b.homing) {
+      const opp = getTarget(b.owner);
+      if (opp) {
+        const targetAngle = Math.atan2(opp.y - b.y, opp.x - b.x);
+        const curAngle = Math.atan2(b.vy, b.vx);
+        let diff = Math.atan2(Math.sin(targetAngle - curAngle), Math.cos(targetAngle - curAngle));
+        const turn = Math.max(-b.homing, Math.min(b.homing, diff));
+        const newAngle = curAngle + turn;
+        const speed = Math.hypot(b.vx, b.vy);
+        b.vx = Math.cos(newAngle) * speed;
+        b.vy = Math.sin(newAngle) * speed;
+      }
+    }
+
+    // molotov arcs through the air: fast at first, slows near the apex (growing larger
+    // as if rising up), then speeds back up as it falls
+    if (b.type === 'molotov') {
+      const progress = Math.min(1, b.traveled / b.range);
+      const speedMult = 1 - 0.75 * Math.sin(progress * Math.PI);
+      b.vx = Math.cos(b.dirAngle) * b.baseSpeed * speedMult;
+      b.vy = Math.sin(b.dirAngle) * b.baseSpeed * speedMult;
+      b.size = b.baseSize * (1 + 1.8 * (1 - speedMult));
+    }
+
+    const prevX = b.x, prevY = b.y;
+    b.x += b.vx;
+    b.y += b.vy;
+    b.traveled += Math.hypot(b.vx, b.vy);
+
+    let remove = false;
+    if (b.x < 0 || b.x > CANVAS_W || b.y < 0 || b.y > CANVAS_H) remove = true;
+    if (b.traveled > b.range) remove = true;
+    // a molotov flying high enough (grown large near its arc's apex) sails over walls
+    const flyingOverWalls = b.type === 'molotov' && b.size > b.baseSize * 1.5;
+    if (!flyingOverWalls) {
+      for (const w of walls) {
+        if (pointInRect(b.x, b.y, w)) {
+          remove = true;
+          if (b.impactBurst) {
+            for (let k = 0; k < 10; k++) {
+              const a = Math.random() * Math.PI * 2;
+              const speed = 1 + Math.random() * 3;
+              particles.push({ x: b.x, y: b.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, life: 300, maxLife: 300, color: Math.random() > 0.5 ? '#7f8c8d' : '#bdc3c7', size: 2 + Math.random() * 4 });
+            }
+            spawnShrapnel(b.x, b.y, b.owner);
+          }
+          break;
+        }
+      }
+    }
+
+    // slasher's blade deflects any bullet sprite it touches
+    if (!remove) {
+      for (const p of players) {
+        if (!p.alive || p.classId !== 'slasher' || p === b.owner) continue;
+        const bx1 = p.x + Math.cos(p.angle) * p.radius * 0.3;
+        const by1 = p.y + Math.sin(p.angle) * p.radius * 0.3;
+        const bx2 = p.x + Math.cos(p.angle) * p.radius * 2.0;
+        const by2 = p.y + Math.sin(p.angle) * p.radius * 2.0;
+        if (pointSegmentDist(b.x, b.y, bx1, by1, bx2, by2) < b.size + 3 ||
+            segmentsIntersect(prevX, prevY, b.x, b.y, bx1, by1, bx2, by2)) {
+          remove = true;
+          for (let k = 0; k < 5; k++) {
+            particles.push({ x: b.x, y: b.y, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 200, maxLife: 200, color: '#ecf0f1', size: 3 });
+          }
+          break;
+        }
+      }
+    }
+
+    // hit an enemy sentry minion
+    if (!remove) {
+      for (let mi = minions.length - 1; mi >= 0; mi--) {
+        const m = minions[mi];
+        if (m === b.owner || m.team === isHumanPlayer(b.owner)) continue;
+        if (Math.hypot(b.x - m.x, b.y - m.y) < m.radius + b.size) {
+          remove = true;
+          m.hp -= b.damage;
+          for (let k = 0; k < 5; k++) {
+            particles.push({ x: m.x, y: m.y, vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2, life: 200, maxLife: 200, color: '#bdc3c7', size: 2 + Math.random() * 2 });
+          }
+          if (m.hp <= 0) {
+            for (let k = 0; k < 10; k++) {
+              particles.push({ x: m.x, y: m.y, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, life: 350, maxLife: 350, color: '#95a5a6', size: 3 + Math.random() * 3 });
+            }
+            minions.splice(mi, 1);
+          }
+          break;
+        }
+      }
+    }
+
+    // hit opponent
+    if (!remove) {
+      const opp = players.find(p => p !== b.owner && p.alive && isHumanPlayer(p) !== isHumanPlayer(b.owner) && !(b.hitSet && b.hitSet.has(p)) && Math.hypot(b.x - p.x, b.y - p.y) < p.radius + b.size);
+      if (opp) {
+        // parry: reflect bullet back at its owner with strong homing
+        if (opp.abilityActive && opp.cls.ability?.type === 'parry') {
+          remove = true;
+          const originalOwner = b.owner;
+          const reflectAngle = originalOwner ? Math.atan2(originalOwner.y - b.y, originalOwner.x - b.x) : Math.atan2(-b.vy, -b.vx);
+          const spd = Math.hypot(b.vx, b.vy);
+          bullets.push({
+            x: b.x, y: b.y,
+            vx: Math.cos(reflectAngle) * spd,
+            vy: Math.sin(reflectAngle) * spd,
+            damage: b.damage,
+            size: b.size,
+            range: Infinity,
+            traveled: 0,
+            owner: opp,
+            type: b.type,
+            color: '#9b59b6',
+            homing: 0.08,
+            poison: 0, poisonDamage: 0,
+            knockback: b.knockback || 0,
+            slowMult: b.slowMult, slowDuration: b.slowDuration,
+            fireRadius: 0, fireDuration: 0, burnDamage: 0,
+            explosionDamage: 0, impactBurst: false, shredChance: 0,
+            dirAngle: reflectAngle, baseSpeed: spd, baseSize: b.size,
+            piercing: false, hitSet: null
+          });
+          for (let k = 0; k < 6; k++) {
+            particles.push({ x: b.x, y: b.y, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 250, maxLife: 250, color: '#9b59b6', size: 3 + Math.random()*2 });
+          }
+        } else {
+        // normal hit (or piercing - doesn't set remove)
+        if (!b.piercing) remove = true;
+        if (b.hitSet) b.hitSet.add(opp);
+        applyDamage(opp, b.damage);
+        if (b.type === 'flame') {
+          opp.burns.push({ timeLeft: 3000, nextTick: 1000 });
+          for (let k = 0; k < 4; k++) {
+            particles.push({ x: b.x, y: b.y, vx: (Math.random()-0.5)*1.5, vy: (Math.random()-0.5)*1.5, life: 250, maxLife: 250, color: '#ffae42', size: 5 });
+          }
+        }
+        if (b.poison) {
+          if (opp.poisonStacks > 0) {
+            applyDamage(opp, b.poisonDamage * opp.poisonStacks);
+          }
+          opp.poisonStacks += b.poison;
+        }
+        if (b.type === 'net') {
+          opp.slowTimer = b.slowDuration;
+          opp.slowMult = b.slowMult;
+          opp.shootBlockTimer = 800;
+        }
+        if (b.tazerSlowMult) {
+          opp.slowTimer = Math.max(opp.slowTimer, b.tazerSlowDuration);
+          opp.slowMult = Math.min(opp.slowMult, b.tazerSlowMult);
+          for (let k = 0; k < 6; k++) {
+            particles.push({ x: b.x, y: b.y, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2, life: 200, maxLife: 200, color: '#f1c40f', size: 2 + Math.random()*2 });
+          }
+        }
+        if (b.knockback) {
+          const angle = Math.atan2(b.vy, b.vx);
+          applyKnockback(opp, angle, b.knockback);
+        }
+
+        // cannonball impact: a big burst of debris plus a ring of shrapnel on a direct hit
+        if (b.impactBurst) {
+          for (let k = 0; k < 16; k++) {
+            const a = Math.random() * Math.PI * 2;
+            const speed = 1.5 + Math.random() * 5;
+            particles.push({ x: b.x, y: b.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, life: 350, maxLife: 350, color: Math.random() > 0.5 ? '#7f8c8d' : '#bdc3c7', size: 3 + Math.random() * 5 });
+          }
+          spawnShrapnel(b.x, b.y, b.owner);
+        }
+
+        // molotov explodes on contact: splash damage + knockback to anyone else nearby
+        if (b.type === 'molotov' && b.explosionDamage) {
+          for (const splash of players) {
+            if (splash === b.owner || splash === opp || !splash.alive || isHumanPlayer(splash) === isHumanPlayer(b.owner)) continue;
+            if (Math.hypot(splash.x - b.x, splash.y - b.y) < b.fireRadius + splash.radius) {
+              applyDamage(splash, b.explosionDamage);
+              applyKnockback(splash, Math.atan2(splash.y - b.y, splash.x - b.x), 14);
+            }
+          }
+          for (let k = 0; k < 10; k++) {
+            const a = Math.random() * Math.PI * 2;
+            const speed = 1 + Math.random() * 3;
+            particles.push({ x: b.x, y: b.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, life: 300, maxLife: 300, color: Math.random() > 0.5 ? '#ff5722' : '#ffca28', size: 5 + Math.random() * 4 });
+          }
+        }
+        } // end else (non-parry hit)
+      }
+    }
+
+    if (b.type === 'flame' && !remove) {
+      particles.push({ x: b.x, y: b.y, vx: -b.vx*0.05, vy: -b.vy*0.05, life: 180, maxLife: 180, color: Math.random() > 0.5 ? '#ff7043' : '#ffca28', size: b.size * (0.6 + Math.random()*0.5) });
+    }
+
+    // molotov shatters into a lingering patch of ground fire wherever it stops
+    if (b.type === 'molotov' && remove) {
+      groundFires.push({ x: b.x, y: b.y, radius: b.fireRadius, timeLeft: b.fireDuration, owner: b.owner, burnDamage: b.burnDamage });
+      for (let k = 0; k < 14; k++) {
+        const a = Math.random() * Math.PI * 2;
+        const d = Math.random() * b.fireRadius;
+        particles.push({ x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d, vx: (Math.random()-0.5)*0.6, vy: -Math.random()*1.2, life: 400, maxLife: 400, color: Math.random() > 0.5 ? '#ff7043' : '#ffca28', size: 4 + Math.random()*4 });
+      }
+    }
+
+    if (remove) bullets.splice(i, 1);
+  }
+
+  // update ground fires: tick down, flicker, and ignite anyone standing in them
+  for (let i = groundFires.length - 1; i >= 0; i--) {
+    const f = groundFires[i];
+    f.timeLeft -= dt;
+    if (f.timeLeft <= 0) { groundFires.splice(i, 1); continue; }
+    if (Math.random() < 0.5) {
+      const a = Math.random() * Math.PI * 2;
+      const d = Math.random() * f.radius;
+      const c = f.napalm
+        ? (Math.random() > 0.5 ? '#00e676' : '#76ff03')
+        : (Math.random() > 0.5 ? '#ff7043' : '#ffca28');
+      particles.push({ x: f.x + Math.cos(a) * d, y: f.y + Math.sin(a) * d, vx: (Math.random()-0.5)*0.6, vy: -Math.random()*1.2, life: 350, maxLife: 350, color: c, size: 3 + Math.random()*4 });
+    }
+    for (const p of players) {
+      if (!p.alive) continue;
+      if (f.napalm && p === f.owner) continue;
+      if (Math.hypot(p.x - f.x, p.y - f.y) < f.radius + p.radius) {
+        // only ignite if they aren't already burning, so stacked fires can't insta-kill
+        if (p.burns.length === 0) {
+          p.burns.push({ timeLeft: 3000, nextTick: 1000, dmg: f.burnDamage });
+        }
+      }
+    }
+  }
+
+  // bear traps: armed permanently until an enemy steps on one, then the sprung trap
+  // sticks around for 1 second (showing the snapped jaws) before disappearing
+  for (let i = traps.length - 1; i >= 0; i--) {
+    const t = traps[i];
+    if (t.sprung) {
+      t.sprungTimer -= dt;
+      if (t.sprungTimer <= 0) traps.splice(i, 1);
+      continue;
+    }
+    if (!t.hidden) {
+      t.hideTimer -= dt;
+      if (t.hideTimer <= 0) t.hidden = true;
+    }
+    for (const p of players) {
+      if (!p.alive || p === t.owner || isHumanPlayer(p) === isHumanPlayer(t.owner)) continue;
+      if (Math.hypot(p.x - t.x, p.y - t.y) < t.triggerRadius + p.radius) {
+        applyDamage(p, t.damage);
+        p.slowTimer = Math.max(p.slowTimer, t.stunDuration);
+        p.slowMult = Math.min(p.slowMult, t.slowMult);
+        p.shootBlockTimer = Math.max(p.shootBlockTimer, t.stunDuration);
+        p.trapIndicatorTimer = t.stunDuration;
+        for (let k = 0; k < 8; k++) {
+          particles.push({ x: t.x, y: t.y, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2, life: 250, maxLife: 250, color: '#e74c3c', size: 3 + Math.random()*2 });
+        }
+        t.sprung = true;
+        t.sprungTimer = 1000;
+        break;
+      }
+    }
+  }
+
+  // update particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // update swings
+  for (let i = swings.length - 1; i >= 0; i--) {
+    swings[i].life -= dt;
+    if (swings[i].life <= 0) swings.splice(i, 1);
+  }
+}
+
+// ---------- Drawing ----------
+let grassPattern = null;
+function buildGrassPattern() {
+  const tile = document.createElement('canvas');
+  tile.width = 64;
+  tile.height = 64;
+  const tctx = tile.getContext('2d');
+
+  // base grass color with subtle patchy variation
+  tctx.fillStyle = '#5b9444';
+  tctx.fillRect(0, 0, 64, 64);
+  for (let i = 0; i < 10; i++) {
+    tctx.fillStyle = Math.random() > 0.5 ? 'rgba(80,140,60,0.35)' : 'rgba(70,120,50,0.35)';
+    const w = 14 + Math.random() * 18;
+    tctx.fillRect(Math.random() * 64, Math.random() * 64, w, w);
+  }
+
+  // grass blades
+  for (let i = 0; i < 90; i++) {
+    const px = Math.random() * 64;
+    const py = Math.random() * 64;
+    const len = 3 + Math.random() * 5;
+    tctx.strokeStyle = Math.random() > 0.5 ? 'rgba(110,170,80,0.7)' : 'rgba(60,100,45,0.7)';
+    tctx.lineWidth = 1;
+    tctx.beginPath();
+    tctx.moveTo(px, py);
+    tctx.lineTo(px + (Math.random() - 0.5) * 3, py - len);
+    tctx.stroke();
+  }
+
+  return ctx.createPattern(tile, 'repeat');
+}
+
+function drawMap() {
+  if (!grassPattern) grassPattern = buildGrassPattern();
+  ctx.fillStyle = grassPattern;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  for (const w of walls) {
+    ctx.fillStyle = '#9c8268';
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(w.x, w.y, w.w, 4);
+    ctx.fillRect(w.x, w.y, 4, w.h);
+    ctx.strokeStyle = '#6e5a45';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(w.x, w.y, w.w, w.h);
+  }
+}
+
+function shadeColor(hex, percent) {
+  const num = parseInt(hex.slice(1), 16);
+  const amt = Math.round(2.55 * percent);
+  let r = (num >> 16) + amt;
+  let g = ((num >> 8) & 0xff) + amt;
+  let b = (num & 0xff) + amt;
+  r = Math.min(255, Math.max(0, r));
+  g = Math.min(255, Math.max(0, g));
+  b = Math.min(255, Math.max(0, b));
+  return `rgb(${r},${g},${b})`;
+}
+
+// draws a small auto-aim turret mounted on a shoulder at the given y-offset, styled
+// per turret type (cannon/shotgun/tazer) (called within the player's translated/rotated drawing context)
+function drawShoulderTurret(radius, yOff, type) {
+  ctx.save();
+  ctx.translate(0, yOff);
+  ctx.fillStyle = '#555';
+  ctx.fillRect(-radius * 0.15, -radius * 0.22, radius * 1.3, radius * 0.44);
+  ctx.beginPath();
+  ctx.arc(-radius * 0.15, 0, radius * 0.28, 0, Math.PI * 2);
+  ctx.fillStyle = '#777';
+  ctx.fill();
+
+  if (type === 'shotgun') {
+    // twin stubby barrels
+    ctx.fillStyle = TURRET_TYPES.shotgun.color;
+    ctx.fillRect(radius * 0.9, -radius * 0.22, radius * 0.45, radius * 0.18);
+    ctx.fillRect(radius * 0.9, radius * 0.04, radius * 0.45, radius * 0.18);
+  } else if (type === 'tazer') {
+    // forked electrode tips
+    ctx.strokeStyle = TURRET_TYPES.tazer.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.9, -radius * 0.1);
+    ctx.lineTo(radius * 1.35, -radius * 0.25);
+    ctx.moveTo(radius * 0.9, radius * 0.1);
+    ctx.lineTo(radius * 1.35, radius * 0.25);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(radius * 1.15, 0, radius * 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = TURRET_TYPES.tazer.color;
+    ctx.fill();
+  } else {
+    // default cannon barrel
+    ctx.beginPath();
+    ctx.arc(radius * 1.15, 0, radius * 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = '#bbb';
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// draws a weapon sprite unique to each class, in the player's facing direction
+// (called within the player's translated/rotated drawing context)
+function drawWeaponSprite(player) {
+  const radius = player.radius;
+  const id = player.classId;
+  ctx.lineCap = 'round';
+
+  if (id === 'sniper') {
+    // long thin barrel with a scope on top
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.3, 0);
+    ctx.lineTo(radius * 2.4, 0);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#2c2c2c';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(radius * 1.0, -1);
+    ctx.lineTo(radius * 1.0, -radius * 0.5);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#555';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(radius * 2.4, 0, 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#3498db';
+    ctx.fill();
+  } else if (id === 'shotgunner') {
+    // short double barrel
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = '#3a2c1c';
+    for (const off of [-2.5, 2.5]) {
+      ctx.beginPath();
+      ctx.moveTo(radius * 0.3, off);
+      ctx.lineTo(radius * 1.5, off);
+      ctx.stroke();
+    }
+  } else if (id === 'flamethrower') {
+    // fuel tank plus a wide flared nozzle
+    ctx.fillStyle = '#c0392b';
+    ctx.fillRect(radius * 0.1, -radius * 0.4, radius * 0.5, radius * 0.8);
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.6, -4);
+    ctx.lineTo(radius * 1.9, -7);
+    ctx.lineTo(radius * 1.9, 7);
+    ctx.lineTo(radius * 0.6, 4);
+    ctx.closePath();
+    ctx.fillStyle = '#7f8c8d';
+    ctx.fill();
+  } else if (id === 'sprayer') {
+    // twin thin barrels
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#2c2c2c';
+    for (const off of [-2.5, 2.5]) {
+      ctx.beginPath();
+      ctx.moveTo(radius * 0.3, off);
+      ctx.lineTo(radius * 1.9, off);
+      ctx.stroke();
+    }
+  } else if (id === 'brawler') {
+    // chunky rifle
+    ctx.fillStyle = '#34495e';
+    ctx.fillRect(radius * 0.3, -3, radius * 1.7, 6);
+    ctx.fillStyle = '#2c2c2c';
+    ctx.fillRect(radius * 1.7, -2, radius * 0.4, 4);
+  } else if (id === 'witch') {
+    // wand with a glowing poison orb
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.3, 0);
+    ctx.lineTo(radius * 1.8, 0);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#6e3b8c';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(radius * 1.9, 0, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#39d353';
+    ctx.fill();
+  } else if (id === 'trapper') {
+    // wide net-launcher funnel
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.3, -5);
+    ctx.lineTo(radius * 1.7, -8);
+    ctx.lineTo(radius * 1.7, 8);
+    ctx.lineTo(radius * 0.3, 5);
+    ctx.closePath();
+    ctx.fillStyle = '#8e44ad';
+    ctx.fill();
+  } else if (id === 'trapLayer') {
+    // stubby pistol with a grip
+    ctx.fillStyle = '#2c2c2c';
+    ctx.fillRect(radius * 0.3, -3, radius * 1.3, 6);
+    ctx.fillRect(radius * 1.0, 2, radius * 0.35, radius * 0.7);
+  } else if (id === 'cannon') {
+    // short, thick barrel with reinforcing bands
+    ctx.fillStyle = '#34495e';
+    ctx.fillRect(radius * 0.2, -radius * 0.55, radius * 1.8, radius * 1.1);
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(radius * 0.5, -radius * 0.6, radius * 0.18, radius * 1.2);
+    ctx.fillRect(radius * 1.1, -radius * 0.6, radius * 0.18, radius * 1.2);
+    ctx.beginPath();
+    ctx.arc(radius * 2.0, 0, radius * 0.42, 0, Math.PI * 2);
+    ctx.fillStyle = '#1c2833';
+    ctx.fill();
+  } else if (id === 'ninja') {
+    // a short curved kunai blade held forward
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.3, 2);
+    ctx.lineTo(radius * 1.8, 0);
+    ctx.lineTo(radius * 0.3, -2);
+    ctx.closePath();
+    ctx.fillStyle = '#ecf0f1';
+    ctx.fill();
+    ctx.fillStyle = '#7f8c8d';
+    ctx.fillRect(0, -2, radius * 0.35, 4);
+  } else if (id === 'melee' || id === 'slasher') {
+    // blade
+    const len = id === 'slasher' ? 2.0 : 2.4;
+    const width = id === 'slasher' ? 3 : 5;
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.3, 0);
+    ctx.lineTo(radius * len, 0);
+    ctx.lineWidth = width;
+    ctx.strokeStyle = '#bdc3c7';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.3, 0);
+    ctx.lineTo(radius * len, 0);
+    ctx.lineWidth = width - 1.5;
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.stroke();
+  } else if (id === 'sentry') {
+    // a compact targeting scanner mounted on a short stub barrel
+    ctx.fillStyle = '#34495e';
+    ctx.fillRect(radius * 0.3, -3, radius * 1.2, 6);
+    ctx.beginPath();
+    ctx.arc(radius * 1.6, 0, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fill();
+  } else if (id === 'molotov') {
+    // a bottle with a lit rag fuse, held out front
+    ctx.save();
+    ctx.translate(radius * 1.2, 0);
+    ctx.fillStyle = '#7f8c8d';
+    ctx.fillRect(-6, -8, 12, 16);
+    ctx.fillStyle = '#ffca28';
+    ctx.beginPath();
+    ctx.moveTo(0, -8);
+    ctx.lineTo(-3, -14);
+    ctx.lineTo(3, -14);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  } else {
+    // generic barrel fallback
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.3, 0);
+    ctx.lineTo(radius * 1.9, 0);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#2c2c2c';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(radius * 1.9, 0, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  }
+}
+
+function drawPlayer(player) {
+  if (!player.alive) return;
+  const { x, y, radius, color, angle } = player;
+
+  // facing direction indicator (cone)
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(0, 0, radius * 2.4, -0.35, 0.35);
+  ctx.closePath();
+  ctx.fill();
+
+  // walking animation: legs swing back and forth based on movement
+  const moveSpeed = Math.hypot(player.vx, player.vy);
+  const legSwing = moveSpeed > 0.01 ? Math.sin(player.walkPhase) * radius * 0.55 : 0;
+  ctx.strokeStyle = shadeColor(color, -30);
+  ctx.lineWidth = radius * 0.4;
+  ctx.lineCap = 'round';
+  for (const side of [1, -1]) {
+    const footOffset = legSwing * side;
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.2, side * radius * 0.45);
+    ctx.lineTo(-radius * 0.2 + footOffset, side * radius * 0.45);
+    ctx.stroke();
+  }
+
+  // torso
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.95, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#fff';
+  ctx.stroke();
+
+  // head (forward of torso, in facing direction)
+  ctx.beginPath();
+  ctx.arc(radius * 0.6, 0, radius * 0.5, 0, Math.PI * 2);
+  ctx.fillStyle = shadeColor(color, 35);
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#fff';
+  ctx.stroke();
+
+  // arms swing opposite to the legs for a natural walk cycle
+  const armSwing = -legSwing * 0.6;
+  ctx.strokeStyle = shadeColor(color, -15);
+  ctx.lineWidth = radius * 0.32;
+  ctx.lineCap = 'round';
+  for (const side of [1, -1]) {
+    const handOffset = armSwing * side;
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.1, side * radius * 0.7);
+    ctx.lineTo(radius * 0.1 + handOffset, side * radius * 0.7);
+    ctx.stroke();
+  }
+
+  // weapon / direction sprite, unique per class
+  drawWeaponSprite(player);
+
+  // shoulder turret perks: small auto-aiming barrels mounted on the shoulders
+  if (player.turrets.length === 1) {
+    drawShoulderTurret(radius, -radius * 0.75, player.turrets[0].type);
+  } else if (player.turrets.length >= 2) {
+    drawShoulderTurret(radius, -radius * 0.75, player.turrets[0].type);
+    drawShoulderTurret(radius, radius * 0.75, player.turrets[1].type);
+  }
+
+  ctx.restore();
+
+  // label
+  ctx.fillStyle = '#fff';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(player.cls.label, x, y - radius - 8);
+
+  // burn stacks indicator
+  let statusY = y + radius + 16;
+  if (player.burns.length > 0) {
+    ctx.fillStyle = '#ff7043';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('BURN x' + player.burns.length, x, statusY);
+    statusY += 14;
+  }
+
+  // poison stacks indicator
+  if (player.poisonStacks > 0) {
+    ctx.fillStyle = '#39d353';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('POISON x' + player.poisonStacks, x, statusY);
+    statusY += 14;
+  }
+
+  // net/slow indicator
+  if (player.slowTimer > 0) {
+    ctx.fillStyle = '#9b59b6';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('TANGLED', x, statusY);
+    statusY += 14;
+  }
+
+  // bear trap backpack count
+  if (player.cls.trap) {
+    ctx.fillStyle = '#16a085';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText(`TRAPS: ${player.traps}/${player.cls.trap.max}`, x, statusY);
+    statusY += 14;
+  }
+
+  // sentry scrap/minion counters
+  if (player.cls.minion) {
+    const count = minions.filter(m => m.owner === player).length;
+    ctx.fillStyle = '#bdc3c7';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText(`SCRAP: ${player.scrap}/${player.cls.scrapMax}  MINIONS: ${count}`, x, statusY);
+    statusY += 14;
+  }
+
+  // ability status
+  if (player.cls.ability) {
+    const ready = player.abilityTimer <= 0 && !player.abilityActive;
+    const label = player.cls.ability.type === 'overclock' ? 'OVERCLOCK'
+      : player.cls.ability.type === 'blastRing' ? 'BUCKSHOT RING'
+      : player.cls.ability.type === 'homingShot' ? 'HOMING SHOT'
+      : player.cls.ability.type === 'napalmTrail' ? 'NAPALM TRAIL'
+      : player.cls.ability.type === 'powerSlam' ? 'GROUND SLAM'
+      : player.cls.ability.type === 'webBurst' ? 'WEB BURST'
+      : player.cls.ability.type === 'trapBarrage' ? 'TRAP BARRAGE'
+      : 'PARRY';
+    ctx.fillStyle = player.abilityActive ? '#f39c12' : ready ? '#2ecc71' : '#e74c3c';
+    ctx.font = 'bold 11px sans-serif';
+    const cdSec = Math.max(0, player.abilityTimer / 1000).toFixed(1);
+    ctx.fillText(player.abilityActive ? `${label}: ACTIVE` : ready ? `${label}: READY` : `${label}: ${cdSec}s`, x, statusY);
+    statusY += 14;
+  }
+}
+
+// stationary turret minions: small drone with a barrel facing its current target, plus an hp bar
+function drawMinions() {
+  for (const m of minions) {
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    ctx.rotate(m.angle);
+    ctx.fillStyle = m.color;
+    ctx.beginPath();
+    ctx.arc(0, 0, m.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+    ctx.fillStyle = '#2c2c2c';
+    ctx.fillRect(0, -2, m.radius + 6, 4);
+    ctx.restore();
+
+    const barW = 24;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(m.x - barW / 2, m.y - m.radius - 10, barW, 4);
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillRect(m.x - barW / 2, m.y - m.radius - 10, barW * Math.max(0, m.hp / m.maxHp), 4);
+  }
+}
+
+function drawBullets() {
+  for (const b of bullets) {
+    if (b.type === 'flame') continue; // flame drawn via particles
+    if (b.type === 'net') {
+      // draw a spinning net mesh
+      const angle = b.traveled * 0.15;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(angle);
+      ctx.strokeStyle = '#bb8fce';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, b.size, 0, Math.PI * 2);
+      ctx.stroke();
+      for (let a = 0; a < Math.PI; a += Math.PI / 3) {
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * -b.size, Math.sin(a) * -b.size);
+        ctx.lineTo(Math.cos(a) * b.size, Math.sin(a) * b.size);
+        ctx.stroke();
+      }
+      ctx.restore();
+      continue;
+    }
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+    ctx.fillStyle = b.color === '#3498db' ? '#aee0ff' : '#ffb3ab';
+    ctx.fill();
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const alpha = Math.max(0, p.life / p.maxLife);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = alpha;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawSwings() {
+  for (const s of swings) {
+    const alpha = Math.max(0, s.life / s.maxLife);
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    if (s.shape === 'rect' && s.sweep) {
+      // sweep the rectangle from one side to the other over its lifetime
+      const progress = 1 - s.life / s.maxLife;
+      const sweepOffset = s.sweep * (progress - 0.5);
+      ctx.rotate(s.angle + sweepOffset);
+    } else {
+      ctx.rotate(s.angle);
+    }
+    ctx.beginPath();
+    if (s.shape === 'rect') {
+      ctx.rect(0, -s.width / 2, s.range, s.width);
+    } else {
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, s.range, -s.arc/2, s.arc/2);
+      ctx.closePath();
+    }
+    ctx.fillStyle = s.color;
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+}
+
+function drawTraps() {
+  for (const t of traps) {
+    // armed traps go invisible 1s after being placed; sprung traps are always shown while fading out
+    if (t.hidden && !t.sprung) continue;
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    if (t.sprung) ctx.globalAlpha = Math.max(0, t.sprungTimer / 1000);
+    // base plate
+    ctx.beginPath();
+    ctx.arc(0, 0, t.triggerRadius + 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#555';
+    ctx.fill();
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    if (t.sprung) {
+      // snapped shut: jaws drawn flat across the plate instead of open around the rim
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-(t.triggerRadius - 1), 0);
+      ctx.lineTo(t.triggerRadius - 1, 0);
+      ctx.stroke();
+    } else {
+      // open jaws (teeth) around the rim
+      ctx.fillStyle = '#ccc';
+      const teeth = 8;
+      for (let i = 0; i < teeth; i++) {
+        const a = (i / teeth) * Math.PI * 2;
+        const ix = Math.cos(a) * (t.triggerRadius - 1);
+        const iy = Math.sin(a) * (t.triggerRadius - 1);
+        const ox = Math.cos(a) * (t.triggerRadius + 5);
+        const oy = Math.sin(a) * (t.triggerRadius + 5);
+        ctx.beginPath();
+        ctx.moveTo(ix, iy);
+        ctx.lineTo(ox, oy);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.stroke();
+      }
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#c0392b';
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+}
+
+function drawGroundFires() {
+  for (const f of groundFires) {
+    const alpha = Math.min(1, f.timeLeft / 1000);
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+    ctx.fillStyle = f.napalm ? '#00c853' : '#ff5722';
+    ctx.globalAlpha = alpha * 0.35;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = f.napalm ? '#76ff03' : '#ffca28';
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
+// simulate a molotov's flight to find where it would land, for the aiming reticle
+function predictMolotovLanding(player) {
+  const w = player.cls.weapon;
+  let x = player.x + Math.cos(player.angle) * (player.radius + 2);
+  let y = player.y + Math.sin(player.angle) * (player.radius + 2);
+  let traveled = 0;
+  while (traveled < w.range) {
+    const progress = Math.min(1, traveled / w.range);
+    const speedMult = 1 - 0.75 * Math.sin(progress * Math.PI);
+    const size = w.size * (1 + 1.8 * (1 - speedMult));
+    const step = w.speed * speedMult;
+    const nx = x + Math.cos(player.angle) * step;
+    const ny = y + Math.sin(player.angle) * step;
+    if (nx < 0 || nx > CANVAS_W || ny < 0 || ny > CANVAS_H) break;
+    if (size <= w.size * 1.5) {
+      let hitWall = false;
+      for (const wall of walls) {
+        if (pointInRect(nx, ny, wall)) { hitWall = true; break; }
+      }
+      if (hitWall) break;
+    }
+    x = nx; y = ny;
+    traveled += step;
+  }
+  return { x, y };
+}
+
+function drawMolotovReticles() {
+  for (const p of players) {
+    if (!p.alive || p.classId !== 'molotov') continue;
+    const landing = predictMolotovLanding(p);
+    ctx.beginPath();
+    ctx.arc(landing.x, landing.y, p.cls.weapon.fireRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = '#ffca28';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 5]);
+    ctx.globalAlpha = 0.6;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.moveTo(landing.x - 6, landing.y);
+    ctx.lineTo(landing.x + 6, landing.y);
+    ctx.moveTo(landing.x, landing.y - 6);
+    ctx.lineTo(landing.x, landing.y + 6);
+    ctx.strokeStyle = '#ff5722';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+}
+
+// coarser line-of-sight check used for the fog-of-war grid (bigger steps, cheaper per cell)
+function hasLineOfSightCoarse(x1, y1, x2, y2) {
+  const dist = Math.hypot(x2 - x1, y2 - y1);
+  const steps = Math.max(1, Math.ceil(dist / 30));
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const px = x1 + (x2 - x1) * t;
+    const py = y1 + (y2 - y1) * t;
+    for (const w of walls) {
+      if (pointInRect(px, py, w)) return false;
+    }
+  }
+  return true;
+}
+
+const FOG_CELL = 15;
+
+// fog is rendered to this offscreen canvas as sharp blocks, then blurred onto the main
+// canvas in one pass - much smoother edges than drawing blocky cells directly
+let fogCanvas = null, fogCtx = null;
+
+function drawFogOfWar() {
+  if (!fogOfWar) return;
+  const viewers = players.slice(0, humanCount).filter(p => p.alive);
+  if (viewers.length === 0) return;
+
+  if (!fogCanvas) {
+    fogCanvas = document.createElement('canvas');
+    fogCanvas.width = CANVAS_W;
+    fogCanvas.height = CANVAS_H;
+    fogCtx = fogCanvas.getContext('2d');
+  }
+  fogCtx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  fogCtx.fillStyle = '#000';
+  for (let gy = 0; gy < CANVAS_H; gy += FOG_CELL) {
+    for (let gx = 0; gx < CANVAS_W; gx += FOG_CELL) {
+      const cx = gx + FOG_CELL / 2, cy = gy + FOG_CELL / 2;
+      const visible = viewers.some(v => hasLineOfSightCoarse(v.x, v.y, cx, cy));
+      if (!visible) {
+        fogCtx.fillRect(gx, gy, FOG_CELL, FOG_CELL);
+      }
+    }
+  }
+
+  ctx.save();
+  ctx.filter = 'blur(16px)';
+  ctx.drawImage(fogCanvas, 0, 0);
+  ctx.filter = 'none';
+  ctx.restore();
+}
+
+const CAMERA_ZOOM = 1.4;
+
+// recomputed once per update tick; null when the zoom camera isn't active, otherwise the
+// world-space viewport rect centered (and clamped) on Player 1 - shared by drawing and mouse aim
+let camera = null;
+
+function computeCamera(dt) {
+  if (!cameraZoomEnabled || !vsAIMode || humanCount !== 1) { camera = null; return; }
+  const human = players[0];
+  if (!human || !human.alive) { camera = null; return; }
+  const viewW = CANVAS_W / CAMERA_ZOOM, viewH = CANVAS_H / CAMERA_ZOOM;
+  const targetX = Math.max(viewW / 2, Math.min(CANVAS_W - viewW / 2, human.x));
+  const targetY = Math.max(viewH / 2, Math.min(CANVAS_H - viewH / 2, human.y));
+  if (!camera) {
+    camera = { camX: targetX, camY: targetY, viewW, viewH };
+  } else {
+    // smoothly ease the camera toward the player instead of snapping every frame,
+    // which at 1.8x zoom made small per-frame jitters very noticeable ("laggy")
+    const ease = Math.min(1, dt * 0.012);
+    camera.camX += (targetX - camera.camX) * ease;
+    camera.camY += (targetY - camera.camY) * ease;
+    camera.viewW = viewW;
+    camera.viewH = viewH;
+  }
+}
+
+// true if (x,y) is within the human player's visible viewport - always true when the
+// zoom camera isn't active, since then the whole map is on screen
+function isInCameraView(x, y) {
+  if (!camera) return true;
+  const left = camera.camX - camera.viewW / 2;
+  const right = camera.camX + camera.viewW / 2;
+  const top = camera.camY - camera.viewH / 2;
+  const bottom = camera.camY + camera.viewH / 2;
+  return x >= left && x <= right && y >= top && y <= bottom;
+}
+
+// converts a mouse position in canvas-pixel space to world coordinates, accounting for
+// the active zoom camera's pan/scale (a no-op when the camera isn't active)
+function screenToWorld(px, py) {
+  if (!camera) return { x: px, y: py };
+  return {
+    x: px / CAMERA_ZOOM + camera.camX - camera.viewW / 2,
+    y: py / CAMERA_ZOOM + camera.camY - camera.viewH / 2
+  };
+}
+
+// in 1-human-vs-AI matches with the zoom option on, center the view on Player 1 and
+// scale everything up, so the map scrolls underneath them instead of them moving on screen
+function applyCameraTransform() {
+  if (!camera) return false;
+  ctx.save();
+  ctx.scale(CAMERA_ZOOM, CAMERA_ZOOM);
+  ctx.translate(camera.viewW / 2 - camera.camX, camera.viewH / 2 - camera.camY);
+  return true;
+}
+
+function draw() {
+  const cameraActive = applyCameraTransform();
+  drawMap();
+  drawTraps();
+  drawGroundFires();
+  drawMolotovReticles();
+  drawParticles();
+  drawBullets();
+  drawSwings();
+  drawMinions();
+  for (const p of players) drawPlayer(p);
+  drawFogOfWar();
+  if (cameraActive) ctx.restore();
+  drawTrappedIndicators();
+}
+
+// in zoom mode, draws an arrow at the screen edge pointing toward any off-screen opponent
+// who's currently caught in a bear trap, so the player knows where to go finish them off
+function drawTrappedIndicators() {
+  if (!camera) return;
+  const halfW = camera.viewW / 2, halfH = camera.viewH / 2;
+  const margin = 36;
+  for (const p of players) {
+    if (p === players[0] || !p.alive || !(p.trapIndicatorTimer > 0)) continue;
+    if (isInCameraView(p.x, p.y)) continue;
+
+    const angle = Math.atan2(p.y - camera.camY, p.x - camera.camX);
+    const cosA = Math.cos(angle), sinA = Math.sin(angle);
+    // project toward the viewport edge (inset by margin) along the direction to the trapped player
+    let t = Infinity;
+    if (cosA !== 0) t = Math.min(t, (halfW - margin) / Math.abs(cosA));
+    if (sinA !== 0) t = Math.min(t, (halfH - margin) / Math.abs(sinA));
+    const wx = camera.camX + cosA * t;
+    const wy = camera.camY + sinA * t;
+    // convert that world point back to screen pixels (camera transform isn't active right now)
+    const sx = (wx - (camera.camX - halfW)) * CAMERA_ZOOM;
+    const sy = (wy - (camera.camY - halfH)) * CAMERA_ZOOM;
+
+    const pulse = 0.6 + 0.4 * Math.sin(performance.now() * 0.008);
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(angle);
+    ctx.globalAlpha = pulse;
+    ctx.beginPath();
+    ctx.moveTo(14, 0);
+    ctx.lineTo(-10, -10);
+    ctx.lineTo(-10, 10);
+    ctx.closePath();
+    ctx.fillStyle = '#e74c3c';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// ---------- Main loop ----------
+function loop(timestamp) {
+  if (!running) return;
+  if (!lastTime) lastTime = timestamp;
+  const dt = Math.min(timestamp - lastTime, 50); // cap dt so pausing doesn't cause a spike
+  lastTime = timestamp;
+
+  if (onlineMode === 'online' && onlineRole === 'host') {
+    injectRemoteKeys();
+    update(dt, timestamp);
+    draw();
+    sendOnlineState();
+  } else if (onlineMode === 'online' && onlineRole === 'guest') {
+    sendOnlineKeys(timestamp);
+    // draw() is called from applyOnlineState when state packet arrives
+  } else {
+    update(dt, timestamp);
+    draw();
+  }
+
+  requestAnimationFrame(loop);
+}
+
+function endGame(winner, message) {
+  running = false;
+  const text = message ? message : (winner ? `${winner.label} (${winner.cls.label}) Wins!` : 'Draw!');
+  document.getElementById('winnerText').textContent = text;
+  document.getElementById('gameOver').style.display = 'block';
+  if (onlineMode === 'online' && onlineRole === 'host' && onlineWs && onlineWs.readyState === 1) {
+    onlineWs.send(JSON.stringify({ type: 'end_game', message: text }));
+  }
+}
+
+// ---------- Input ----------
+window.addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === ' ' || e.key.startsWith('Arrow') || e.key === '/') e.preventDefault();
+});
+window.addEventListener('keyup', (e) => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = (e.clientX - rect.left) * (CANVAS_W / rect.width);
+  mouseY = (e.clientY - rect.top) * (CANVAS_H / rect.height);
+});
+
+canvas.addEventListener('mousedown', () => { mouseDown = true; });
+window.addEventListener('mouseup', () => { mouseDown = false; });
+
+// ---------- UI wiring ----------
+let lastSetup = null;
+
+function startGame() {
+  const mapId = document.getElementById('mapSelect').value;
+  const p1Class = document.getElementById('p1Class').value;
+  const p2Class = document.getElementById('p2Class').value;
+  const p1Perks = [document.getElementById('p1Perk').value, document.getElementById('p1Perk2').value];
+  const p2Perks = [document.getElementById('p2Perk').value, document.getElementById('p2Perk2').value];
+  const p1AI = document.getElementById('p1AI').checked;
+  const p2AI = document.getElementById('p2AI').checked;
+  const p1Difficulty = document.getElementById('p1Difficulty').value;
+  const p2Difficulty = document.getElementById('p2Difficulty').value;
+  const numAI = parseInt(document.getElementById('numAI').value, 10) || 1;
+  const fogOfWarEnabled = document.getElementById('fogOfWar').checked;
+  const coopMode = document.getElementById('coopMode').checked;
+  const aiClass = document.getElementById('aiClass').value;
+  const aiPerks = [document.getElementById('aiPerk').value, document.getElementById('aiPerk2').value];
+  const aiDifficulty = document.getElementById('aiDifficulty').value;
+  cameraZoomEnabled = document.getElementById('cameraZoom').checked;
+  lastSetup = { mapId, p1Class, p2Class, p1Perks, p2Perks, p1AI, p2AI, p1Difficulty, p2Difficulty, numAI, fogOfWarEnabled, coopMode, aiClass, aiPerks, aiDifficulty };
+
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('gameOver').style.display = 'none';
+  document.getElementById('hud').style.display = 'flex';
+  canvas.style.display = 'block';
+
+  setupGame(mapId, p1Class, p2Class, p1Perks, p2Perks, p1AI, p2AI, p1Difficulty, p2Difficulty, numAI, fogOfWarEnabled, coopMode, aiClass, aiPerks, aiDifficulty);
+  running = true;
+  lastTime = null;
+  requestAnimationFrame(loop);
+}
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+
+document.getElementById('rematchBtn').addEventListener('click', () => {
+  document.getElementById('gameOver').style.display = 'none';
+  setupGame(lastSetup.mapId, lastSetup.p1Class, lastSetup.p2Class, lastSetup.p1Perks, lastSetup.p2Perks, lastSetup.p1AI, lastSetup.p2AI, lastSetup.p1Difficulty, lastSetup.p2Difficulty, lastSetup.numAI, lastSetup.fogOfWarEnabled, lastSetup.coopMode, lastSetup.aiClass, lastSetup.aiPerks, lastSetup.aiDifficulty);
+  running = true;
+  lastTime = null;
+  requestAnimationFrame(loop);
+});
+
+document.getElementById('menuBtn').addEventListener('click', () => {
+  document.getElementById('gameOver').style.display = 'none';
+  document.getElementById('hud').style.display = 'none';
+  canvas.style.display = 'none';
+  document.getElementById('setup').style.display = 'block';
+});
+
+// ---------- Online mode ----------
+let onlineMode = null;   // null | 'host' | 'guest'
+let onlineRole = null;   // 'host' | 'guest'
+let onlineWs = null;
+let remoteKeys = {};
+
+// ---- helpers ----
+function showScreen(id) {
+  for (const s of ['setup','onlineConnect','onlineQueue','onlineLobbyScreen','hud']) {
+    const el = document.getElementById(s);
+    if (el) el.style.display = 'none';
+  }
+  canvas.style.display = 'none';
+  const target = document.getElementById(id);
+  if (target) target.style.display = id === 'hud' ? 'flex' : 'block';
+}
+
+function setConnectStatus(msg) { document.getElementById('onlineConnectStatus').textContent = msg; }
+function setQueueStatus(msg)   { document.getElementById('queueStatus').textContent = msg; }
+
+// ---- UI button wiring ----
+document.getElementById('onlineBtn').addEventListener('click', () => showScreen('onlineConnect'));
+document.getElementById('onlineConnectBackBtn').addEventListener('click', () => showScreen('setup'));
+document.getElementById('cancelQueueBtn').addEventListener('click', () => { disconnectOnline(); showScreen('setup'); });
+document.getElementById('onlineLeaveLobbyBtn').addEventListener('click', () => { disconnectOnline(); showScreen('setup'); });
+
+document.getElementById('onlineConnectBtn').addEventListener('click', () => {
+  const ip = document.getElementById('serverIpInput').value.trim() || 'localhost';
+  setConnectStatus('Connecting…');
+  connectOnline(ip);
+});
+
+// Lobby: broadcast my selections whenever they change
+function broadcastLobby() {
+  if (!onlineWs || onlineWs.readyState !== 1) return;
+  const data = {
+    classId: document.getElementById('onlineMyClass').value,
+    perks: [document.getElementById('onlineMyPerk').value, document.getElementById('onlineMyPerk2').value],
+    mapId: document.getElementById('onlineMapSelect').value,
+  };
+  onlineWs.send(JSON.stringify({ type: 'lobby_update', data }));
+}
+for (const id of ['onlineMyClass','onlineMyPerk','onlineMyPerk2','onlineMapSelect']) {
+  document.getElementById(id).addEventListener('change', () => { broadcastLobby(); updateReadyBtn(); });
+}
+
+let myReady = false;
+function updateReadyBtn() {
+  const btn = document.getElementById('onlineReadyBtn');
+  btn.textContent = myReady ? '✓ Ready (click to unready)' : '✓ Ready';
+  btn.style.background = myReady ? '#27ae60' : '#2ecc71';
+}
+
+document.getElementById('onlineReadyBtn').addEventListener('click', () => {
+  myReady = !myReady;
+  updateReadyBtn();
+  if (onlineWs && onlineWs.readyState === 1) {
+    onlineWs.send(JSON.stringify({ type: 'set_ready', ready: myReady }));
+  }
+});
+
+// ---- Connection ----
+function connectOnline(ip) {
+  disconnectOnline();
+  const ws = new WebSocket(`ws://${ip}:3000`);
+  onlineWs = ws;
+
+  ws.onopen = () => {
+    setConnectStatus('Connected — joining queue…');
+    ws.send(JSON.stringify({ type: 'join_queue' }));
+  };
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+
+    if (msg.type === 'queued') {
+      showScreen('onlineQueue');
+      setQueueStatus(`In queue — searching for an opponent…`);
+    }
+
+    if (msg.type === 'matched') {
+      onlineRole = msg.role;
+      onlineMode = 'online';
+      myReady = false;
+      updateReadyBtn();
+      document.getElementById('lobbyRoleLabel').textContent =
+        onlineRole === 'host' ? 'You are Player 1 (WASD / Space / E / Q)' : 'You are Player 2 (Arrow Keys / ? / . / ,)';
+      document.getElementById('hostMapPanel').style.display = onlineRole === 'host' ? 'block' : 'none';
+      document.getElementById('lobbyCountdown').textContent = '';
+      document.getElementById('opponentClass').textContent = 'Waiting for opponent…';
+      document.getElementById('opponentPerk').textContent = '';
+      document.getElementById('opponentPerk2').textContent = '';
+      document.getElementById('opponentMap').textContent = '';
+      document.getElementById('opponentReadyLabel').textContent = 'Not ready';
+      document.getElementById('opponentReadyLabel').style.color = '#e74c3c';
+      showScreen('onlineLobbyScreen');
+      broadcastLobby();
+    }
+
+    if (msg.type === 'opponent_lobby') {
+      const d = msg.data;
+      const classLabel = (CLASSES[d.classId] || {}).label || d.classId;
+      document.getElementById('opponentClass').textContent = classLabel;
+      document.getElementById('opponentPerk').textContent = d.perks && d.perks[0] !== 'none' ? `Perk: ${d.perks[0]}` : '';
+      document.getElementById('opponentPerk2').textContent = d.perks && d.perks[1] !== 'none' ? `Perk 2: ${d.perks[1]}` : '';
+      if (onlineRole === 'guest' && d.mapId) {
+        document.getElementById('opponentMap').textContent = `Map: ${d.mapId}`;
+      }
+    }
+
+    if (msg.type === 'ready_state') {
+      const myIsHost = onlineRole === 'host';
+      const oppReady = myIsHost ? msg.guestReady : msg.hostReady;
+      document.getElementById('opponentReadyLabel').textContent = oppReady ? 'Ready ✓' : 'Not ready';
+      document.getElementById('opponentReadyLabel').style.color = oppReady ? '#2ecc71' : '#e74c3c';
+      if (msg.hostReady && msg.guestReady) {
+        document.getElementById('lobbyCountdown').textContent = 'Both ready — starting…';
+      }
+    }
+
+    if (msg.type === 'start_game') {
+      launchOnlineGame(msg);
+    }
+
+    if (msg.type === 'state') {
+      applyOnlineState(msg);
+    }
+
+    if (msg.type === 'keys') {
+      remoteKeys = msg.pressed;
+    }
+
+    if (msg.type === 'end_game') {
+      endGame(null, msg.message);
+    }
+
+    if (msg.type === 'opponent_disconnected') {
+      endGame(null, 'Opponent disconnected.');
+    }
+
+    if (msg.type === 'error') {
+      setConnectStatus('Error: ' + msg.message);
+      showScreen('onlineConnect');
+    }
+  };
+
+  ws.onclose = () => {
+    if (running) endGame(null, 'Connection lost.');
+  };
+
+  ws.onerror = () => {
+    setConnectStatus('Could not connect. Is the server running?');
+  };
+}
+
+function disconnectOnline() {
+  if (onlineWs) { try { onlineWs.close(); } catch(e){} onlineWs = null; }
+  onlineMode = null;
+  onlineRole = null;
+  remoteKeys = {};
+}
+
+// ---- Launch game from lobby config ----
+function launchOnlineGame(cfg) {
+  // host = P1 (blue, WASD), guest = P2 (red, arrow keys)
+  const p1Class = onlineRole === 'host' ? document.getElementById('onlineMyClass').value : cfg.p1Class;
+  const p2Class = onlineRole === 'guest' ? document.getElementById('onlineMyClass').value : cfg.p2Class;
+  const p1Perks = onlineRole === 'host'
+    ? [document.getElementById('onlineMyPerk').value, document.getElementById('onlineMyPerk2').value]
+    : cfg.p1Perks;
+  const p2Perks = onlineRole === 'guest'
+    ? [document.getElementById('onlineMyPerk').value, document.getElementById('onlineMyPerk2').value]
+    : cfg.p2Perks;
+
+  setupGame(cfg.mapId, p1Class, p2Class, p1Perks, p2Perks,
+    false, false, 'medium', 'medium', 1, false, false, p2Class, p2Perks, 'medium');
+
+  if (onlineRole === 'guest') {
+    humanCount = 0; // guest doesn't drive the simulation
+  }
+
+  showScreen('hud');
+  canvas.style.display = 'block';
+  running = true;
+  lastTime = null;
+  requestAnimationFrame(loop);
+}
+
+// ---- Host: inject guest keys before update ----
+function injectRemoteKeys() {
+  if (!players[1] || !players[1].controls) return;
+  const c = players[1].controls;
+  for (const keyName of Object.values(c)) {
+    keys[keyName] = !!remoteKeys[keyName];
+  }
+}
+
+// ---- Host: serialize and send full draw state ----
+function sendOnlineState() {
+  if (!onlineWs || onlineWs.readyState !== 1) return;
+  onlineWs.send(JSON.stringify({
+    type: 'state',
+    players: players.map(p => ({
+      x: p.x, y: p.y, angle: p.angle,
+      hp: p.hp, maxHp: p.maxHp, alive: p.alive,
+      color: p.color, radius: p.radius, label: p.label, classId: p.classId,
+      walkPhase: p.walkPhase,
+      burnCount: p.burns ? p.burns.length : 0,
+      poisonStacks: p.poisonStacks || 0,
+      slowMult: p.slowMult || 1,
+      trapCount: traps.filter(t => t.owner === p).length,
+      scrap: p.scrap || 0,
+      scrapMax: p.cls ? (p.cls.scrapMax || 0) : 0,
+      abilityTimer: p.abilityTimer || 0,
+      abilityActive: p.abilityActive || false,
+      abilityType: p.cls && p.cls.ability ? p.cls.ability.type : null,
+      abilityCooldown: p.cls && p.cls.ability ? p.cls.ability.cooldown : 0,
+    })),
+    bullets: bullets.map(b => ({ x: b.x, y: b.y, size: b.baseSize || b.size, color: b.color, type: b.type, traveled: b.traveled, range: b.range })),
+    swings: swings.map(s => ({ x: s.x, y: s.y, angle: s.angle, arc: s.arc, range: s.range, width: s.width, shape: s.shape || 'arc', sweep: s.sweep || 0, life: s.life, maxLife: s.maxLife, color: s.color })),
+    particles: particles.map(p => ({ x: p.x, y: p.y, color: p.color, size: p.size, life: p.life, maxLife: p.maxLife })),
+    groundFires: groundFires.map(f => ({ x: f.x, y: f.y, radius: f.radius, timeLeft: f.timeLeft, napalm: !!f.napalm })),
+    traps: traps.map(t => ({ x: t.x, y: t.y, hidden: t.hidden, triggerRadius: t.triggerRadius })),
+    minions: minions.map(m => ({ x: m.x, y: m.y, angle: m.angle, radius: m.radius, color: m.color, hp: m.hp, maxHp: m.maxHp })),
+    humanCount,
+    walls: walls.map(w => ({ x: w.x, y: w.y, w: w.w, h: w.h })),
+    gameOver: !running,
+  }));
+}
+
+// ---- Guest: apply state received from host ----
+function applyOnlineState(state) {
+  walls = state.walls;
+  players = state.players.map(pd => {
+    const cls = CLASSES[pd.classId] || {};
+    const abilityStub = pd.abilityType ? { type: pd.abilityType, cooldown: pd.abilityCooldown } : null;
+    return {
+      x: pd.x, y: pd.y, angle: pd.angle,
+      hp: pd.hp, maxHp: pd.maxHp, alive: pd.alive,
+      color: pd.color, radius: pd.radius, label: pd.label, classId: pd.classId,
+      walkPhase: pd.walkPhase,
+      cls: { ...cls, ability: abilityStub },
+      burns: new Array(pd.burnCount).fill({ timeLeft: 1 }),
+      poisonStacks: pd.poisonStacks,
+      slowMult: pd.slowMult,
+      _trapCount: pd.trapCount,
+      scrap: pd.scrap,
+      abilityTimer: pd.abilityTimer,
+      abilityActive: pd.abilityActive,
+      isAI: false, vx: 0, vy: 0
+    };
+  });
+  bullets = state.bullets.map(b => ({ ...b, baseSize: b.size, dirAngle: 0 }));
+  swings = state.swings;
+  particles = state.particles;
+  groundFires = state.groundFires.map(f => ({ ...f, maxLife: f.timeLeft + 1 }));
+  traps = state.traps;
+  minions = state.minions;
+  humanCount = state.humanCount;
+  if (state.gameOver) running = false;
+  draw();
+}
+
+// ---- Guest: send keys to host ----
+let _lastKeySend = 0;
+function sendOnlineKeys(now) {
+  if (!onlineWs || onlineWs.readyState !== 1) return;
+  if (now - _lastKeySend < 16) return;
+  _lastKeySend = now;
+  onlineWs.send(JSON.stringify({ type: 'keys', pressed: { ...keys } }));
+}
+
+// Patch drawPlayer for guest-side trap count (owners aren't serialized)
+const _origDrawPlayer = drawPlayer;
+function drawPlayer(player) {
+  if (onlineMode === 'online' && onlineRole === 'guest' && player._trapCount !== undefined) {
+    const fakeTraps = new Array(player._trapCount).fill({ owner: player });
+    const saved = traps;
+    traps = fakeTraps;
+    _origDrawPlayer(player);
+    traps = saved;
+  } else {
+    _origDrawPlayer(player);
+  }
+}
+</script>
+</body>
+</html>
