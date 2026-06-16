@@ -113,11 +113,8 @@
 <!-- Online: connect screen -->
 <div id="onlineConnect" class="overlay" style="display:none; text-align:center; max-width:480px; margin:40px auto;">
   <h2>Play Online</h2>
-  <p style="color:#aaa; margin-bottom:20px;">Enter the server address to connect. If you're hosting, start the server first with <code>node server.js</code> in your terminal.</p>
-  <input id="serverIpInput" value="localhost" style="padding:10px; font-size:15px; width:260px; border-radius:6px; border:1px solid #555; background:#1f1f1f; color:#eee;">
-  <div style="margin-top:12px;">
-    <button id="onlineConnectBtn" style="font-size:15px; padding:10px 28px;">Connect &amp; Find Match</button>
-  </div>
+  <p style="color:#aaa; margin-bottom:20px;">Click below to find a match. No sign-up needed.</p>
+  <button id="onlineConnectBtn" style="font-size:16px; padding:12px 36px; background:#2980b9;">Find Match</button>
   <div id="onlineConnectStatus" style="color:#aaa; margin-top:14px; min-height:20px;"></div>
   <button id="onlineConnectBackBtn" style="background:#555; margin-top:16px;">← Back</button>
 </div>
@@ -3332,9 +3329,8 @@ document.getElementById('cancelQueueBtn').addEventListener('click', () => { disc
 document.getElementById('onlineLeaveLobbyBtn').addEventListener('click', () => { disconnectOnline(); showScreen('setup'); });
 
 document.getElementById('onlineConnectBtn').addEventListener('click', () => {
-  const ip = document.getElementById('serverIpInput').value.trim() || 'localhost';
   setConnectStatus('Connecting…');
-  connectOnline(ip);
+  connectOnline();
 });
 
 // Lobby: broadcast my selections whenever they change
@@ -3367,9 +3363,11 @@ document.getElementById('onlineReadyBtn').addEventListener('click', () => {
 });
 
 // ---- Connection ----
-function connectOnline(ip) {
+const ONLINE_SERVER = 'wss://two-player-battle-production.up.railway.app';
+
+function connectOnline() {
   disconnectOnline();
-  const ws = new WebSocket(`ws://${ip}:3000`);
+  const ws = new WebSocket(ONLINE_SERVER);
   onlineWs = ws;
 
   ws.onopen = () => {
