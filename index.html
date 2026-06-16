@@ -3490,6 +3490,11 @@ function launchOnlineGame(cfg) {
     humanCount = 0; // guest doesn't drive the simulation
   }
 
+  // send walls once to guest so they don't need to be in every state packet
+  if (onlineRole === 'host' && onlineWs && onlineWs.readyState === 1) {
+    onlineWs.send(JSON.stringify({ type: 'state', walls: walls.map(w => ({ x: w.x, y: w.y, w: w.w, h: w.h })), players: [], bullets: [], swings: [], groundFires: [], traps: [], minions: [], humanCount, gameOver: false }));
+  }
+
   showScreen('hud');
   canvas.style.display = 'block';
   running = true;
@@ -3506,45 +3511,46 @@ function injectRemoteKeys() {
   }
 }
 
-// ---- Host: serialize and send full draw state ----
+// ---- Host: serialize and send draw state (capped at 20hz, no particles, no walls) ----
+let _lastStateSend = 0;
 function sendOnlineState() {
   if (!onlineWs || onlineWs.readyState !== 1) return;
+  const now = performance.now();
+  if (now - _lastStateSend < 50) return; // 20hz cap
+  _lastStateSend = now;
   onlineWs.send(JSON.stringify({
     type: 'state',
     players: players.map(p => ({
-      x: p.x, y: p.y, angle: p.angle,
-      hp: p.hp, maxHp: p.maxHp, alive: p.alive,
+      x: Math.round(p.x), y: Math.round(p.y), angle: +p.angle.toFixed(3),
+      hp: Math.round(p.hp), maxHp: p.maxHp, alive: p.alive,
       color: p.color, radius: p.radius, label: p.label, classId: p.classId,
-      walkPhase: p.walkPhase,
+      walkPhase: +p.walkPhase.toFixed(3),
       burnCount: p.burns ? p.burns.length : 0,
       poisonStacks: p.poisonStacks || 0,
       slowMult: p.slowMult || 1,
       trapCount: traps.filter(t => t.owner === p).length,
-      scrap: p.scrap || 0,
-      scrapMax: p.cls ? (p.cls.scrapMax || 0) : 0,
-      abilityTimer: p.abilityTimer || 0,
+      scrap: Math.round(p.scrap || 0),
+      abilityTimer: Math.round(p.abilityTimer || 0),
       abilityActive: p.abilityActive || false,
       abilityType: p.cls && p.cls.ability ? p.cls.ability.type : null,
       abilityCooldown: p.cls && p.cls.ability ? p.cls.ability.cooldown : 0,
       slowTimer: p.slowTimer || 0,
       turrets: p.turrets ? p.turrets.map(t => ({ type: t.type })) : [],
-      vx: p.vx || 0, vy: p.vy || 0,
+      vx: +((p.vx || 0).toFixed(2)), vy: +((p.vy || 0).toFixed(2)),
     })),
-    bullets: bullets.map(b => ({ x: b.x, y: b.y, size: b.baseSize || b.size, color: b.color, type: b.type, traveled: b.traveled, range: b.range })),
-    swings: swings.map(s => ({ x: s.x, y: s.y, angle: s.angle, arc: s.arc, range: s.range, width: s.width, shape: s.shape || 'arc', sweep: s.sweep || 0, life: s.life, maxLife: s.maxLife, color: s.color })),
-    particles: particles.map(p => ({ x: p.x, y: p.y, color: p.color, size: p.size, life: p.life, maxLife: p.maxLife })),
-    groundFires: groundFires.map(f => ({ x: f.x, y: f.y, radius: f.radius, timeLeft: f.timeLeft, napalm: !!f.napalm })),
-    traps: traps.map(t => ({ x: t.x, y: t.y, hidden: t.hidden, triggerRadius: t.triggerRadius })),
-    minions: minions.map(m => ({ x: m.x, y: m.y, angle: m.angle, radius: m.radius, color: m.color, hp: m.hp, maxHp: m.maxHp })),
+    bullets: bullets.map(b => [Math.round(b.x), Math.round(b.y), b.baseSize || b.size, b.color, b.type]),
+    swings: swings.map(s => ({ x: Math.round(s.x), y: Math.round(s.y), angle: +s.angle.toFixed(3), arc: s.arc, range: s.range, width: s.width, shape: s.shape || 'arc', sweep: s.sweep || 0, life: s.life, maxLife: s.maxLife, color: s.color })),
+    groundFires: groundFires.map(f => [Math.round(f.x), Math.round(f.y), f.radius, Math.round(f.timeLeft), f.napalm ? 1 : 0]),
+    traps: traps.map(t => [Math.round(t.x), Math.round(t.y), t.hidden ? 1 : 0, t.triggerRadius]),
+    minions: minions.map(m => [Math.round(m.x), Math.round(m.y), +m.angle.toFixed(3), m.radius, m.color, Math.round(m.hp), m.maxHp]),
     humanCount,
-    walls: walls.map(w => ({ x: w.x, y: w.y, w: w.w, h: w.h })),
     gameOver: !running,
   }));
 }
 
 // ---- Guest: apply state received from host ----
 function applyOnlineState(state) {
-  walls = state.walls;
+  if (state.walls) walls = state.walls; // only sent once at game start
   players = state.players.map(pd => {
     const cls = CLASSES[pd.classId] || {};
     const abilityStub = pd.abilityType ? { type: pd.abilityType, cooldown: pd.abilityCooldown } : null;
@@ -3566,12 +3572,16 @@ function applyOnlineState(state) {
       isAI: false, vx: pd.vx || 0, vy: pd.vy || 0
     };
   });
-  bullets = state.bullets.map(b => ({ ...b, baseSize: b.size, dirAngle: 0 }));
+  // bullets are compact arrays: [x, y, size, color, type]
+  bullets = state.bullets.map(b => ({ x: b[0], y: b[1], size: b[2], baseSize: b[2], color: b[3], type: b[4], dirAngle: 0, traveled: 0, range: 9999 }));
   swings = state.swings;
-  particles = state.particles;
-  groundFires = state.groundFires.map(f => ({ ...f, maxLife: f.timeLeft + 1 }));
-  traps = state.traps;
-  minions = state.minions;
+  particles = []; // not sent to save bandwidth — guest has no particles
+  // groundFires: [x, y, radius, timeLeft, napalm]
+  groundFires = state.groundFires.map(f => ({ x: f[0], y: f[1], radius: f[2], timeLeft: f[3], maxLife: f[3] + 1, napalm: !!f[4] }));
+  // traps: [x, y, hidden, triggerRadius]
+  traps = state.traps.map(t => ({ x: t[0], y: t[1], hidden: !!t[2], triggerRadius: t[3] }));
+  // minions: [x, y, angle, radius, color, hp, maxHp]
+  minions = state.minions.map(m => ({ x: m[0], y: m[1], angle: m[2], radius: m[3], color: m[4], hp: m[5], maxHp: m[6] }));
   humanCount = state.humanCount;
   if (state.gameOver) running = false;
   draw();
