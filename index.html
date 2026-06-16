@@ -3526,6 +3526,9 @@ function sendOnlineState() {
       abilityActive: p.abilityActive || false,
       abilityType: p.cls && p.cls.ability ? p.cls.ability.type : null,
       abilityCooldown: p.cls && p.cls.ability ? p.cls.ability.cooldown : 0,
+      slowTimer: p.slowTimer || 0,
+      turrets: p.turrets ? p.turrets.map(t => ({ type: t.type })) : [],
+      vx: p.vx || 0, vy: p.vy || 0,
     })),
     bullets: bullets.map(b => ({ x: b.x, y: b.y, size: b.baseSize || b.size, color: b.color, type: b.type, traveled: b.traveled, range: b.range })),
     swings: swings.map(s => ({ x: s.x, y: s.y, angle: s.angle, arc: s.arc, range: s.range, width: s.width, shape: s.shape || 'arc', sweep: s.sweep || 0, life: s.life, maxLife: s.maxLife, color: s.color })),
@@ -3558,7 +3561,9 @@ function applyOnlineState(state) {
       scrap: pd.scrap,
       abilityTimer: pd.abilityTimer,
       abilityActive: pd.abilityActive,
-      isAI: false, vx: 0, vy: 0
+      slowTimer: pd.slowTimer || 0,
+      turrets: pd.turrets || [],
+      isAI: false, vx: pd.vx || 0, vy: pd.vy || 0
     };
   });
   bullets = state.bullets.map(b => ({ ...b, baseSize: b.size, dirAngle: 0 }));
