@@ -493,7 +493,8 @@ const CLASSES = {
     weapon: {
       type: 'molotov', damage: 15, cooldown: 750, speed: 14, range: 500, size: 6, spread: 0.05, pellets: 1,
       fireRadius: 70, fireDuration: 5000, burnDamage: 10, explosionDamage: 12
-    }
+    },
+    ability: { type: 'fireShower', cooldown: 10000 }
   },
   trapLayer: {
     label: 'Trap Layer', hp: 135, speed: 2.7, color: '#16a085', radius: 17,
@@ -506,7 +507,8 @@ const CLASSES = {
     weapon: {
       type: 'bullet', damage: 50, cooldown: 1750, speed: 9, range: 900, size: 14, spread: 0.02, pellets: 1,
       knockback: 42, impactBurst: true
-    }
+    },
+    ability: { type: 'cannonBarrage', cooldown: 9000 }
   },
   ninja: {
     label: 'Ninja', hp: 115, speed: 3.4, color: '#2c3e50', radius: 15,
@@ -1275,6 +1277,75 @@ function useAbility(player, now) {
     }
     player.abilityTimer = ab.cooldown;
 
+  } else if (type === 'cannonBarrage') {
+    // fire 3 cannonballs in a tight spread — like a triple-shot burst
+    const w = player.cls.weapon;
+    const offsets = [-0.18, 0, 0.18];
+    for (const off of offsets) {
+      const a = player.angle + off;
+      bullets.push({
+        x: player.x + Math.cos(a) * (player.radius + 4),
+        y: player.y + Math.sin(a) * (player.radius + 4),
+        vx: Math.cos(a) * w.speed,
+        vy: Math.sin(a) * w.speed,
+        damage: w.damage,
+        size: w.size,
+        range: w.range,
+        traveled: 0,
+        owner: player,
+        type: 'bullet',
+        color: player.color,
+        homing: 0,
+        poison: 0, poisonDamage: 0,
+        knockback: w.knockback || 42,
+        slowMult: undefined, slowDuration: undefined,
+        fireRadius: 0, fireDuration: 0, burnDamage: 0,
+        explosionDamage: 0, impactBurst: true, shredChance: 0,
+        dirAngle: a, baseSpeed: w.speed, baseSize: w.size,
+        piercing: false, hitSet: null
+      });
+    }
+    for (let k = 0; k < 18; k++) {
+      const a = player.angle + (Math.random() - 0.5) * 0.6;
+      particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * (4 + Math.random() * 5), vy: Math.sin(a) * (4 + Math.random() * 5), life: 350, maxLife: 350, color: k % 2 === 0 ? '#5d6d7e' : '#aab7b8', size: 4 + Math.random() * 4 });
+    }
+    player.abilityTimer = ab.cooldown;
+
+  } else if (type === 'fireShower') {
+    // lob 4 molotovs in a wide fan arc
+    const w = player.cls.weapon;
+    const count = 4;
+    const fanArc = 0.8;
+    for (let i = 0; i < count; i++) {
+      const a = player.angle + (i / (count - 1) - 0.5) * fanArc;
+      bullets.push({
+        x: player.x + Math.cos(a) * (player.radius + 2),
+        y: player.y + Math.sin(a) * (player.radius + 2),
+        vx: Math.cos(a) * w.speed,
+        vy: Math.sin(a) * w.speed,
+        damage: w.damage,
+        size: w.size,
+        range: w.range,
+        traveled: 0,
+        owner: player,
+        type: 'molotov',
+        color: '#e67e22',
+        homing: 0,
+        poison: 0, poisonDamage: 0,
+        knockback: 0,
+        slowMult: undefined, slowDuration: undefined,
+        fireRadius: w.fireRadius, fireDuration: w.fireDuration, burnDamage: w.burnDamage,
+        explosionDamage: w.explosionDamage || 0, impactBurst: false, shredChance: 0,
+        dirAngle: a, baseSpeed: w.speed, baseSize: w.size,
+        piercing: false, hitSet: null
+      });
+    }
+    for (let k = 0; k < 12; k++) {
+      const a = player.angle + (Math.random() - 0.5) * fanArc;
+      particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * (3 + Math.random() * 4), vy: Math.sin(a) * (3 + Math.random() * 4), life: 300, maxLife: 300, color: k % 2 === 0 ? '#e67e22' : '#f39c12', size: 3 + Math.random() * 3 });
+    }
+    player.abilityTimer = ab.cooldown;
+
   } else if (type === 'trapBarrage') {
     // two concentric rings of traps: 5 inner, 7 outer
     const t = player.cls.trap;
@@ -1591,6 +1662,8 @@ function updateAI(ai, now, dt) {
     else if (type === 'parry' && dist < 200) useAbility(ai, now);
     else if (type === 'trapBarrage' && dist < 300) useAbility(ai, now);
     else if (type === 'webBurst' && dist < 600) useAbility(ai, now);
+    else if (type === 'cannonBarrage' && dist < 700) useAbility(ai, now);
+    else if (type === 'fireShower' && dist < 600) useAbility(ai, now);
   }
 
   const dx = opp.x - ai.x, dy = opp.y - ai.y;
