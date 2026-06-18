@@ -744,6 +744,8 @@ const MAPS = {
 
 // ---------- Game state ----------
 let players, bullets, swings, particles, groundFires, traps, minions, walls, keys, lastTime, running, fogOfWar;
+let healthCrates = [];
+let storm = null; // { cx, cy, currentR, targetR, shrinkRate, damagePerSec, phase, phaseTimer, phaseDuration }
 let CHOKEPOINTS = [];
 let vsAIMode = false;
 let cameraZoomEnabled = false;
@@ -911,7 +913,8 @@ function createPlayer(classId, perkIds, x, y, color, controls, isAI, difficultyI
     abilityActive: false,
     abilityActiveTimer: 0,
     homingReady: false,
-    _napalmAccum: 0
+    _napalmAccum: 0,
+    trapRevealTimer: 0
   };
 }
 
@@ -935,6 +938,19 @@ function setupGame(mapId, p1Class, p2Class, p1Perks, p2Perks, p1AI, p2AI, p1Diff
   groundFires = [];
   traps = [];
   minions = [];
+  healthCrates = [];
+  // storm: starts large, shrinks in phases over ~2.5 minutes
+  storm = {
+    cx: CANVAS_W / 2, cy: CANVAS_H / 2,
+    currentR: Math.max(CANVAS_W, CANVAS_H),
+    targetR: 520,
+    shrinkRate: 0,
+    damagePerSec: 12,
+    phase: 0,
+    phaseTimer: 18000,  // 18s before first shrink begins
+    phaseDuration: 18000,
+    _crateTimer: 6000   // first crate in 6s
+  };
   keys = {};
   CHOKEPOINTS = computeChokepoints();
 
@@ -1937,6 +1953,8 @@ function update(dt, now) {
       }
     }
 
+    if (player.trapRevealTimer > 0) player.trapRevealTimer -= dt;
+
     // slow debuff from nets
     if (player.slowTimer > 0) {
       player.slowTimer -= dt;
@@ -2156,6 +2174,12 @@ function update(dt, now) {
       if (!p.alive || isHumanPlayer(p) === m.team) continue;
       const d = Math.hypot(p.x - m.x, p.y - m.y);
       if (d < targetDist) { targetDist = d; target = p; }
+    }
+    // also target enemy minions (sentry vs sentry)
+    for (const em of minions) {
+      if (em === m || em.team === m.team) continue;
+      const d = Math.hypot(em.x - m.x, em.y - m.y);
+      if (d < targetDist) { targetDist = d; target = em; }
     }
     const spec = m.owner.cls.minion;
     if (target && targetDist <= spec.range && hasLineOfSight(m.x, m.y, target.x, target.y)) {
@@ -2461,6 +2485,7 @@ function update(dt, now) {
         p.slowMult = Math.min(p.slowMult, t.slowMult);
         p.shootBlockTimer = Math.max(p.shootBlockTimer, t.stunDuration);
         p.trapIndicatorTimer = t.stunDuration;
+        p.trapRevealTimer = 2000;
         for (let k = 0; k < 8; k++) {
           particles.push({ x: t.x, y: t.y, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2, life: 250, maxLife: 250, color: '#e74c3c', size: 3 + Math.random()*2 });
         }
@@ -2484,6 +2509,67 @@ function update(dt, now) {
   for (let i = swings.length - 1; i >= 0; i--) {
     swings[i].life -= dt;
     if (swings[i].life <= 0) swings.splice(i, 1);
+  }
+
+  // ---------- Storm ----------
+  if (storm) {
+    storm.phaseTimer -= dt;
+    if (storm.currentR > storm.targetR) {
+      // actively shrinking
+      const rate = (storm.phase === 0 ? 55 : storm.phase === 1 ? 80 : storm.phase === 2 ? 110 : 150);
+      storm.currentR = Math.max(storm.targetR, storm.currentR - rate * (dt / 1000));
+    }
+    if (storm.phaseTimer <= 0) {
+      storm.phase++;
+      storm.phaseTimer = storm.phaseDuration;
+      const targets = [420, 300, 180, 80];
+      storm.targetR = targets[Math.min(storm.phase, targets.length - 1)];
+      // randomize center slightly each phase
+      const spread = 60;
+      storm.cx = Math.max(storm.targetR + 50, Math.min(CANVAS_W - storm.targetR - 50, CANVAS_W/2 + (Math.random()-0.5)*spread));
+      storm.cy = Math.max(storm.targetR + 50, Math.min(CANVAS_H - storm.targetR - 50, CANVAS_H/2 + (Math.random()-0.5)*spread));
+    }
+    // damage players outside the safe zone
+    for (const p of players) {
+      if (!p.alive) continue;
+      const dist = Math.hypot(p.x - storm.cx, p.y - storm.cy);
+      if (dist > storm.currentR) {
+        applyDamage(p, storm.damagePerSec * (dt / 1000));
+        // red tint flash
+        if (!p._stormFlash) p._stormFlash = 0;
+        p._stormFlash = 200;
+      }
+      if (p._stormFlash > 0) p._stormFlash -= dt;
+    }
+  }
+
+  // ---------- Health crates ----------
+  if (storm) {
+    storm._crateTimer -= dt;
+    if (storm._crateTimer <= 0 && healthCrates.length < 4) {
+      storm._crateTimer = 8000 + Math.random() * 6000;
+      // pick a random point inside the safe zone
+      const r = storm.currentR * 0.8;
+      const angle = Math.random() * Math.PI * 2;
+      const cx = storm.cx + Math.cos(angle) * Math.random() * r;
+      const cy = storm.cy + Math.sin(angle) * Math.random() * r;
+      healthCrates.push({ x: Math.max(30, Math.min(CANVAS_W-30, cx)), y: Math.max(30, Math.min(CANVAS_H-30, cy)), heal: 35, radius: 16 });
+    }
+  }
+  for (let i = healthCrates.length - 1; i >= 0; i--) {
+    const crate = healthCrates[i];
+    for (const p of players) {
+      if (!p.alive) continue;
+      if (Math.hypot(p.x - crate.x, p.y - crate.y) < p.radius + crate.radius) {
+        p.hp = Math.min(p.maxHp, p.hp + crate.heal);
+        for (let k = 0; k < 10; k++) {
+          const a = Math.random() * Math.PI * 2;
+          particles.push({ x: crate.x, y: crate.y, vx: Math.cos(a)*2, vy: Math.sin(a)*2, life: 400, maxLife: 400, color: k%2===0?'#2ecc71':'#27ae60', size: 3+Math.random()*3 });
+        }
+        healthCrates.splice(i, 1);
+        break;
+      }
+    }
   }
 }
 
@@ -2992,12 +3078,23 @@ function drawSwings() {
 }
 
 function drawTraps() {
+  // if a human player was just trapped, reveal all hidden traps for 2s
+  const trapRevealActive = players.some(p => !p.isAI && p.trapRevealTimer > 0);
   for (const t of traps) {
     // armed traps go invisible 1s after being placed; sprung traps are always shown while fading out
-    if (t.hidden && !t.sprung) continue;
+    if (t.hidden && !t.sprung && !trapRevealActive) continue;
     ctx.save();
     ctx.translate(t.x, t.y);
     if (t.sprung) ctx.globalAlpha = Math.max(0, t.sprungTimer / 1000);
+    // revealed-but-hidden traps glow red so the player can see them
+    if (t.hidden && !t.sprung && trapRevealActive) {
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.arc(0, 0, t.triggerRadius + 10, 0, Math.PI * 2);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
     // base plate
     ctx.beginPath();
     ctx.arc(0, 0, t.triggerRadius + 4, 0, Math.PI * 2);
@@ -3220,6 +3317,8 @@ function applyCameraTransform() {
 function draw() {
   const cameraActive = applyCameraTransform();
   drawMap();
+  drawStorm();
+  drawHealthCrates();
   drawTraps();
   drawGroundFires();
   drawMolotovReticles();
@@ -3231,6 +3330,7 @@ function draw() {
   drawFogOfWar();
   if (cameraActive) ctx.restore();
   drawTrappedIndicators();
+  drawStormHUD();
 }
 
 // in zoom mode, draws an arrow at the screen edge pointing toward any off-screen opponent
@@ -3270,6 +3370,63 @@ function drawTrappedIndicators() {
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawStorm() {
+  if (!storm) return;
+  const r = storm.currentR;
+  // dark blue fog outside the safe zone
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.arc(storm.cx, storm.cy, r, 0, Math.PI * 2, true); // cutout
+  ctx.fillStyle = 'rgba(30, 60, 160, 0.38)';
+  ctx.fill('evenodd');
+  // animated border ring
+  const pulse = 0.6 + 0.4 * Math.sin(performance.now() * 0.003);
+  ctx.beginPath();
+  ctx.arc(storm.cx, storm.cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(80, 160, 255, ${0.7 * pulse})`;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStormHUD() {
+  if (!storm) return;
+  // show shrink warning when the storm is actively closing in
+  if (storm.currentR > storm.targetR + 5) {
+    const t = performance.now();
+    const alpha = 0.5 + 0.5 * Math.sin(t * 0.006);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#5dade2';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚡ Storm closing in!', CANVAS_W / 2, 38);
+    ctx.restore();
+  }
+}
+
+function drawHealthCrates() {
+  for (const c of healthCrates) {
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    const s = c.radius;
+    // green crate box
+    ctx.fillStyle = '#1e8449';
+    ctx.strokeStyle = '#27ae60';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.rect(-s, -s, s*2, s*2);
+    ctx.fill();
+    ctx.stroke();
+    // white cross
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(-s*0.55, -s*0.2, s*1.1, s*0.4);
+    ctx.fillRect(-s*0.2, -s*0.55, s*0.4, s*1.1);
     ctx.restore();
   }
 }
