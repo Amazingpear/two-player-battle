@@ -956,8 +956,8 @@ function setupGame(mapId, p1Class, p2Class, p1Perks, p2Perks, p1AI, p2AI, p1Diff
     shrinkRate: 0,
     damagePerSec: 12,
     phase: 0,
-    phaseTimer: 18000,  // 18s before first shrink begins
-    phaseDuration: 18000,
+    phaseTimer: 40000,  // 40s before first shrink begins
+    phaseDuration: 35000,
     _crateTimer: 6000   // first crate in 6s
   };
   keys = {};
@@ -2563,7 +2563,7 @@ function update(dt, now) {
     storm.phaseTimer -= dt;
     if (storm.currentR > storm.targetR) {
       // actively shrinking
-      const rate = (storm.phase === 0 ? 55 : storm.phase === 1 ? 80 : storm.phase === 2 ? 110 : 150);
+      const rate = (storm.phase === 0 ? 28 : storm.phase === 1 ? 45 : storm.phase === 2 ? 65 : 90);
       storm.currentR = Math.max(storm.targetR, storm.currentR - rate * (dt / 1000));
     }
     if (storm.phaseTimer <= 0) {
@@ -3573,21 +3573,18 @@ function drawTrappedIndicators() {
 function drawStorm() {
   if (!storm) return;
   const r = storm.currentR;
-  // dark blue fog outside the safe zone
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, CANVAS_W, CANVAS_H);
-  ctx.arc(storm.cx, storm.cy, r, 0, Math.PI * 2, true); // cutout
-  ctx.fillStyle = 'rgba(30, 60, 160, 0.38)';
-  ctx.fill('evenodd');
-  // animated border ring
-  const pulse = 0.6 + 0.4 * Math.sin(performance.now() * 0.003);
+  // radial gradient: transparent inside safe zone, blue fog outside — single cheap fill
+  const grad = ctx.createRadialGradient(storm.cx, storm.cy, r * 0.88, storm.cx, storm.cy, r * 1.35);
+  grad.addColorStop(0, 'rgba(20,50,140,0)');
+  grad.addColorStop(1, 'rgba(20,50,140,0.55)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  // simple border ring, no pulse math
   ctx.beginPath();
   ctx.arc(storm.cx, storm.cy, r, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(80, 160, 255, ${0.7 * pulse})`;
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(80,160,255,0.75)';
+  ctx.lineWidth = 3;
   ctx.stroke();
-  ctx.restore();
 }
 
 function drawStormHUD() {
