@@ -511,17 +511,17 @@ const CLASSES = {
     ability: { type: 'cannonBarrage', cooldown: 9000 }
   },
   ninja: {
-    label: 'Ninja', hp: 95, speed: 3.0, color: '#2c3e50', radius: 15,
+    label: 'Ninja', hp: 80, speed: 2.8, color: '#2c3e50', radius: 15,
     // dash: a fast burst that tears straight through walls, slicing any opponent in its path
-    weapon: { type: 'dash', damage: 32, cooldown: 1100, dashSpeed: 20, dashDuration: 240, range: 280, knockback: 20 }
+    weapon: { type: 'dash', damage: 24, cooldown: 1500, dashSpeed: 18, dashDuration: 220, range: 250, knockback: 16 }
   },
   sentry: {
-    label: 'Sentry', hp: 130, speed: 2.2, color: '#7f8c8d', radius: 18,
+    label: 'Sentry', hp: 110, speed: 2.2, color: '#7f8c8d', radius: 18,
     weapon: { type: 'bullet', damage: 9, cooldown: 500, speed: 14, range: 550, size: 4, spread: 0.1, pellets: 1 },
     // scrap is collected passively over time and spent to deploy turret minions that
     // hunt down and shoot the nearest enemy on their own - no cap on how many can be active
-    scrapPerSec: 5, scrapMax: 120,
-    minion: { cost: 45, hp: 40, damage: 7, cooldown: 600, range: 520, bulletSpeed: 14, radius: 10 }
+    scrapPerSec: 4, scrapMax: 120,
+    minion: { cost: 55, hp: 35, damage: 6, cooldown: 700, range: 500, bulletSpeed: 14, radius: 10 }
   }
 };
 
