@@ -425,7 +425,7 @@
 <div id="hud"></div>
 
 <div id="wrapper">
-  <canvas id="gameCanvas" width="1350" height="900"></canvas>
+  <canvas id="gameCanvas" width="1600" height="1050"></canvas>
   <div id="gameOver">
     <h2 id="winnerText">Player 1 Wins!</h2>
     <button id="rematchBtn">Rematch (same setup)</button><br>
@@ -434,7 +434,7 @@
 </div>
 
 <script>
-const CANVAS_W = 1350, CANVAS_H = 900;
+const CANVAS_W = 1600, CANVAS_H = 1050;
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -462,9 +462,9 @@ const CLASSES = {
     ability: { type: 'overclock', cooldown: 11000, duration: 2500 }
   },
   melee: {
-    label: 'Melee', hp: 150, speed: 3.3, color: '#9b59b6', radius: 18,
-    weapon: { type: 'melee', damage: 62, cooldown: 420, range: 130, arc: 1.0 },
-    ability: { type: 'parry', cooldown: 8000, duration: 3000 }
+    label: 'Melee', hp: 130, speed: 2.9, color: '#9b59b6', radius: 18,
+    weapon: { type: 'melee', damage: 50, cooldown: 500, range: 120, arc: 1.0 },
+    ability: { type: 'parry', cooldown: 9000, duration: 1800 }
   },
   brawler: {
     label: 'Brawler', hp: 120, speed: 2.6, color: '#f1c40f', radius: 17,
@@ -511,17 +511,17 @@ const CLASSES = {
     ability: { type: 'cannonBarrage', cooldown: 9000 }
   },
   ninja: {
-    label: 'Ninja', hp: 115, speed: 3.4, color: '#2c3e50', radius: 15,
+    label: 'Ninja', hp: 95, speed: 3.0, color: '#2c3e50', radius: 15,
     // dash: a fast burst that tears straight through walls, slicing any opponent in its path
-    weapon: { type: 'dash', damage: 45, cooldown: 750, dashSpeed: 24, dashDuration: 260, range: 320, knockback: 28 }
+    weapon: { type: 'dash', damage: 32, cooldown: 1100, dashSpeed: 20, dashDuration: 240, range: 280, knockback: 20 }
   },
   sentry: {
-    label: 'Sentry', hp: 150, speed: 2.2, color: '#7f8c8d', radius: 18,
+    label: 'Sentry', hp: 130, speed: 2.2, color: '#7f8c8d', radius: 18,
     weapon: { type: 'bullet', damage: 9, cooldown: 500, speed: 14, range: 550, size: 4, spread: 0.1, pellets: 1 },
     // scrap is collected passively over time and spent to deploy turret minions that
     // hunt down and shoot the nearest enemy on their own - no cap on how many can be active
-    scrapPerSec: 7, scrapMax: 120,
-    minion: { cost: 30, hp: 55, damage: 9, cooldown: 500, range: 520, bulletSpeed: 14, radius: 10 }
+    scrapPerSec: 5, scrapMax: 120,
+    minion: { cost: 45, hp: 40, damage: 7, cooldown: 600, range: 520, bulletSpeed: 14, radius: 10 }
   }
 };
 
@@ -558,186 +558,186 @@ const MAPS = {
   open: {
     name: 'Open Arena',
     walls: [
-      {x: 570, y: 375, w: 210, h: 150}, // central block
-      {x: 195, y: 375, w: 120, h: 120},
-      {x: 1035, y: 375, w: 120, h: 120},
-      {x: 600, y: 120, w: 150, h: 30},
-      {x: 600, y: 750, w: 150, h: 30},
-      {x: 300, y: 600, w: 70, h: 70},
-      {x: 975, y: 600, w: 70, h: 70},
-      {x: 440, y: 440, w: 50, h: 50},
-      {x: 860, y: 440, w: 50, h: 50}
+      {x: 676, y: 438, w: 249, h: 175},
+      {x: 231, y: 438, w: 142, h: 140},
+      {x: 1227, y: 438, w: 142, h: 140},
+      {x: 711, y: 140, w: 178, h: 35},
+      {x: 711, y: 875, w: 178, h: 35},
+      {x: 356, y: 700, w: 83, h: 82},
+      {x: 1156, y: 700, w: 83, h: 82},
+      {x: 521, y: 513, w: 59, h: 58},
+      {x: 1019, y: 513, w: 59, h: 58}
     ]
   },
   cross: {
     name: 'Crossroads',
     walls: [
-      {x: 0, y: 0, w: 570, h: 45},
-      {x: 780, y: 0, w: 570, h: 45},
-      {x: 0, y: 855, w: 570, h: 45},
-      {x: 780, y: 855, w: 570, h: 45},
-      {x: 0, y: 0, w: 45, h: 345},
-      {x: 0, y: 555, w: 45, h: 345},
-      {x: 1305, y: 0, w: 45, h: 345},
-      {x: 1305, y: 555, w: 45, h: 345},
-      {x: 630, y: 405, w: 90, h: 90},
-      {x: 300, y: 180, w: 50, h: 50},
-      {x: 1000, y: 180, w: 50, h: 50},
-      {x: 300, y: 670, w: 50, h: 50},
-      {x: 1000, y: 670, w: 50, h: 50},
-      {x: 460, y: 460, w: 40, h: 40},
-      {x: 850, y: 460, w: 40, h: 40},
-      {x: 650, y: 240, w: 50, h: 40},
-      {x: 650, y: 620, w: 50, h: 40}
+      {x: 0, y: 0, w: 676, h: 52},
+      {x: 924, y: 0, w: 676, h: 52},
+      {x: 0, y: 998, w: 676, h: 52},
+      {x: 924, y: 998, w: 676, h: 52},
+      {x: 0, y: 0, w: 53, h: 402},
+      {x: 0, y: 648, w: 53, h: 402},
+      {x: 1547, y: 0, w: 53, h: 402},
+      {x: 1547, y: 648, w: 53, h: 402},
+      {x: 747, y: 473, w: 107, h: 105},
+      {x: 356, y: 210, w: 59, h: 58},
+      {x: 1185, y: 210, w: 59, h: 58},
+      {x: 356, y: 782, w: 59, h: 58},
+      {x: 1185, y: 782, w: 59, h: 58},
+      {x: 545, y: 537, w: 47, h: 47},
+      {x: 1007, y: 537, w: 47, h: 47},
+      {x: 770, y: 280, w: 59, h: 47},
+      {x: 770, y: 723, w: 59, h: 47}
     ]
   },
   pillars: {
     name: 'Pillar Field',
     walls: [
-      {x: 225, y: 180, w: 90, h: 90},
-      {x: 1035, y: 180, w: 90, h: 90},
-      {x: 225, y: 630, w: 90, h: 90},
-      {x: 1035, y: 630, w: 90, h: 90},
-      {x: 630, y: 405, w: 90, h: 90},
-      {x: 630, y: 135, w: 90, h: 60},
-      {x: 630, y: 705, w: 90, h: 60},
-      {x: 100, y: 405, w: 60, h: 90},
-      {x: 1190, y: 405, w: 60, h: 90},
-      {x: 400, y: 300, w: 50, h: 50},
-      {x: 900, y: 300, w: 50, h: 50},
-      {x: 400, y: 550, w: 50, h: 50},
-      {x: 900, y: 550, w: 50, h: 50}
+      {x: 267, y: 210, w: 107, h: 105},
+      {x: 1227, y: 210, w: 107, h: 105},
+      {x: 267, y: 735, w: 107, h: 105},
+      {x: 1227, y: 735, w: 107, h: 105},
+      {x: 747, y: 473, w: 107, h: 105},
+      {x: 747, y: 158, w: 107, h: 70},
+      {x: 747, y: 822, w: 107, h: 70},
+      {x: 119, y: 473, w: 71, h: 105},
+      {x: 1410, y: 473, w: 71, h: 105},
+      {x: 474, y: 350, w: 59, h: 58},
+      {x: 1067, y: 350, w: 59, h: 58},
+      {x: 474, y: 642, w: 59, h: 58},
+      {x: 1067, y: 642, w: 59, h: 58}
     ]
   },
   diagonal: {
     name: 'Diagonal Divide',
     walls: [
-      {x: 150, y: 120, w: 240, h: 45},
-      {x: 420, y: 270, w: 240, h: 45},
-      {x: 690, y: 420, w: 240, h: 45},
-      {x: 960, y: 570, w: 240, h: 45},
-      {x: 960, y: 120, w: 45, h: 210},
-      {x: 345, y: 570, w: 45, h: 210},
-      {x: 1100, y: 120, w: 150, h: 30},
-      {x: 100, y: 750, w: 150, h: 30},
-      {x: 550, y: 550, w: 50, h: 50},
-      {x: 800, y: 250, w: 50, h: 50},
-      {x: 250, y: 450, w: 50, h: 50},
-      {x: 1050, y: 450, w: 50, h: 50}
+      {x: 178, y: 140, w: 284, h: 52},
+      {x: 498, y: 315, w: 284, h: 52},
+      {x: 818, y: 490, w: 284, h: 52},
+      {x: 1138, y: 665, w: 284, h: 52},
+      {x: 1138, y: 140, w: 53, h: 245},
+      {x: 409, y: 665, w: 53, h: 245},
+      {x: 1304, y: 140, w: 178, h: 35},
+      {x: 119, y: 875, w: 178, h: 35},
+      {x: 652, y: 642, w: 59, h: 58},
+      {x: 948, y: 292, w: 59, h: 58},
+      {x: 296, y: 525, w: 59, h: 58},
+      {x: 1244, y: 525, w: 59, h: 58}
     ]
   },
   fortress: {
     name: 'Fortress',
     walls: [
-      {x: 375, y: 225, w: 600, h: 30},
-      {x: 375, y: 645, w: 600, h: 30},
-      {x: 375, y: 225, w: 30, h: 135},
-      {x: 375, y: 540, w: 30, h: 135},
-      {x: 945, y: 225, w: 30, h: 135},
-      {x: 945, y: 540, w: 30, h: 135},
-      {x: 645, y: 405, w: 60, h: 90},
-      {x: 225, y: 225, w: 60, h: 60},
-      {x: 1065, y: 225, w: 60, h: 60},
-      {x: 225, y: 615, w: 60, h: 60},
-      {x: 1065, y: 615, w: 60, h: 60},
-      {x: 300, y: 405, w: 40, h: 40},
-      {x: 1010, y: 405, w: 40, h: 40},
-      {x: 645, y: 280, w: 60, h: 30},
-      {x: 645, y: 590, w: 60, h: 30}
+      {x: 444, y: 262, w: 711, h: 35},
+      {x: 444, y: 752, w: 711, h: 35},
+      {x: 444, y: 262, w: 36, h: 158},
+      {x: 444, y: 630, w: 36, h: 158},
+      {x: 1120, y: 262, w: 36, h: 158},
+      {x: 1120, y: 630, w: 36, h: 158},
+      {x: 764, y: 473, w: 71, h: 105},
+      {x: 267, y: 262, w: 71, h: 70},
+      {x: 1262, y: 262, w: 71, h: 70},
+      {x: 267, y: 718, w: 71, h: 70},
+      {x: 1262, y: 718, w: 71, h: 70},
+      {x: 356, y: 473, w: 47, h: 47},
+      {x: 1197, y: 473, w: 47, h: 47},
+      {x: 764, y: 327, w: 71, h: 35},
+      {x: 764, y: 688, w: 71, h: 35}
     ]
   },
   arena2: {
     name: 'Quad Rooms',
     walls: [
-      {x: 660, y: 0, w: 30, h: 330},
-      {x: 660, y: 570, w: 30, h: 330},
-      {x: 0, y: 435, w: 330, h: 30},
-      {x: 1020, y: 435, w: 330, h: 30},
-      {x: 540, y: 405, w: 270, h: 90},
-      {x: 200, y: 150, w: 60, h: 60},
-      {x: 1090, y: 150, w: 60, h: 60},
-      {x: 200, y: 690, w: 60, h: 60},
-      {x: 1090, y: 690, w: 60, h: 60},
-      {x: 330, y: 600, w: 50, h: 50},
-      {x: 970, y: 600, w: 50, h: 50},
-      {x: 330, y: 250, w: 50, h: 50},
-      {x: 970, y: 250, w: 50, h: 50}
+      {x: 782, y: 0, w: 36, h: 385},
+      {x: 782, y: 665, w: 36, h: 385},
+      {x: 0, y: 508, w: 391, h: 35},
+      {x: 1209, y: 508, w: 391, h: 35},
+      {x: 640, y: 473, w: 320, h: 105},
+      {x: 237, y: 175, w: 71, h: 70},
+      {x: 1292, y: 175, w: 71, h: 70},
+      {x: 237, y: 805, w: 71, h: 70},
+      {x: 1292, y: 805, w: 71, h: 70},
+      {x: 391, y: 700, w: 59, h: 58},
+      {x: 1150, y: 700, w: 59, h: 58},
+      {x: 391, y: 292, w: 59, h: 58},
+      {x: 1150, y: 292, w: 59, h: 58}
     ]
   },
   bridge: {
     name: 'Bridge',
     walls: [
-      {x: 375, y: 0, w: 600, h: 345},
-      {x: 375, y: 555, w: 600, h: 345},
-      {x: 120, y: 405, w: 60, h: 90},
-      {x: 1170, y: 405, w: 60, h: 90},
-      {x: 250, y: 420, w: 50, h: 60},
-      {x: 1050, y: 420, w: 50, h: 60},
-      {x: 660, y: 405, w: 30, h: 90}
+      {x: 444, y: 0, w: 711, h: 402},
+      {x: 444, y: 648, w: 711, h: 402},
+      {x: 142, y: 473, w: 71, h: 105},
+      {x: 1387, y: 473, w: 71, h: 105},
+      {x: 296, y: 490, w: 59, h: 70},
+      {x: 1244, y: 490, w: 59, h: 70},
+      {x: 782, y: 473, w: 36, h: 105}
     ]
   },
   spiral: {
     name: 'Spiral',
     walls: [
-      {x: 150, y: 150, w: 900, h: 30},
-      {x: 150, y: 150, w: 30, h: 450},
-      {x: 150, y: 720, w: 750, h: 30},
-      {x: 870, y: 300, w: 30, h: 450},
-      {x: 390, y: 360, w: 480, h: 30},
-      {x: 390, y: 360, w: 30, h: 240},
-      {x: 600, y: 480, w: 30, h: 120},
-      {x: 220, y: 220, w: 50, h: 50},
-      {x: 1020, y: 600, w: 50, h: 50},
-      {x: 720, y: 620, w: 50, h: 50}
+      {x: 178, y: 175, w: 1067, h: 35},
+      {x: 178, y: 175, w: 36, h: 525},
+      {x: 178, y: 840, w: 889, h: 35},
+      {x: 1031, y: 350, w: 36, h: 525},
+      {x: 462, y: 420, w: 569, h: 35},
+      {x: 462, y: 420, w: 36, h: 280},
+      {x: 711, y: 560, w: 36, h: 140},
+      {x: 261, y: 257, w: 59, h: 58},
+      {x: 1209, y: 700, w: 59, h: 58},
+      {x: 853, y: 723, w: 59, h: 58}
     ]
   },
   islands: {
     name: 'Islands',
     walls: [
-      {x: 225, y: 120, w: 195, h: 135},
-      {x: 930, y: 120, w: 195, h: 135},
-      {x: 225, y: 645, w: 195, h: 135},
-      {x: 930, y: 645, w: 195, h: 135},
-      {x: 578, y: 383, w: 195, h: 135},
-      {x: 75, y: 382, w: 120, h: 135},
-      {x: 1155, y: 382, w: 120, h: 135},
-      {x: 675, y: 150, w: 50, h: 50},
-      {x: 675, y: 650, w: 50, h: 50},
-      {x: 450, y: 250, w: 40, h: 40},
-      {x: 850, y: 250, w: 40, h: 40}
+      {x: 267, y: 140, w: 231, h: 158},
+      {x: 1102, y: 140, w: 231, h: 158},
+      {x: 267, y: 752, w: 231, h: 158},
+      {x: 1102, y: 752, w: 231, h: 158},
+      {x: 685, y: 447, w: 231, h: 158},
+      {x: 89, y: 446, w: 142, h: 158},
+      {x: 1369, y: 446, w: 142, h: 158},
+      {x: 800, y: 175, w: 59, h: 58},
+      {x: 800, y: 758, w: 59, h: 58},
+      {x: 533, y: 292, w: 47, h: 47},
+      {x: 1007, y: 292, w: 47, h: 47}
     ]
   },
   building: {
     name: 'Building',
     walls: [
       // outer perimeter
-      {x: 60, y: 60, w: 1230, h: 20},
-      {x: 60, y: 820, w: 1230, h: 20},
-      {x: 60, y: 60, w: 20, h: 780},
-      {x: 1270, y: 60, w: 20, h: 780},
-      // internal vertical walls (x=470 and x=880) with doorway gaps per row
-      {x: 470, y: 60, w: 20, h: 90},
-      {x: 470, y: 230, w: 20, h: 180},
-      {x: 470, y: 490, w: 20, h: 180},
-      {x: 470, y: 750, w: 20, h: 90},
-      {x: 880, y: 60, w: 20, h: 90},
-      {x: 880, y: 230, w: 20, h: 180},
-      {x: 880, y: 490, w: 20, h: 180},
-      {x: 880, y: 750, w: 20, h: 90},
-      // internal horizontal walls (y=320 and y=580) with doorway gaps per column
-      {x: 60, y: 320, w: 165, h: 20},
-      {x: 305, y: 320, w: 330, h: 20},
-      {x: 715, y: 320, w: 330, h: 20},
-      {x: 1125, y: 320, w: 165, h: 20},
-      {x: 60, y: 580, w: 165, h: 20},
-      {x: 305, y: 580, w: 330, h: 20},
-      {x: 715, y: 580, w: 330, h: 20},
-      {x: 1125, y: 580, w: 165, h: 20},
-      // furniture/pillars scattered through a few rooms
-      {x: 645, y: 420, w: 60, h: 60},
-      {x: 1040, y: 150, w: 50, h: 50},
-      {x: 230, y: 670, w: 50, h: 50},
-      {x: 650, y: 160, w: 50, h: 50}
+      {x: 71, y: 70, w: 1458, h: 23},
+      {x: 71, y: 957, w: 1458, h: 23},
+      {x: 71, y: 70, w: 24, h: 910},
+      {x: 1505, y: 70, w: 24, h: 910},
+      // internal vertical walls with doorway gaps
+      {x: 557, y: 70, w: 24, h: 105},
+      {x: 557, y: 268, w: 24, h: 210},
+      {x: 557, y: 572, w: 24, h: 210},
+      {x: 557, y: 875, w: 24, h: 105},
+      {x: 1043, y: 70, w: 24, h: 105},
+      {x: 1043, y: 268, w: 24, h: 210},
+      {x: 1043, y: 572, w: 24, h: 210},
+      {x: 1043, y: 875, w: 24, h: 105},
+      // internal horizontal walls with doorway gaps
+      {x: 71, y: 373, w: 196, h: 23},
+      {x: 361, y: 373, w: 391, h: 23},
+      {x: 847, y: 373, w: 391, h: 23},
+      {x: 1333, y: 373, w: 196, h: 23},
+      {x: 71, y: 677, w: 196, h: 23},
+      {x: 361, y: 677, w: 391, h: 23},
+      {x: 847, y: 677, w: 391, h: 23},
+      {x: 1333, y: 677, w: 196, h: 23},
+      // furniture/pillars
+      {x: 764, y: 490, w: 71, h: 70},
+      {x: 1233, y: 175, w: 59, h: 58},
+      {x: 273, y: 782, w: 59, h: 58},
+      {x: 770, y: 187, w: 59, h: 58}
     ]
   }
 };
