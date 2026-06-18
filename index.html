@@ -2355,7 +2355,7 @@ function update(dt, now) {
         if (b.type === 'net') {
           opp.slowTimer = b.slowDuration;
           opp.slowMult = b.slowMult;
-          opp.shootBlockTimer = 800;
+          opp.shootBlockTimer = b.slowDuration;
         }
         if (b.tazerSlowMult) {
           opp.slowTimer = Math.max(opp.slowTimer, b.tazerSlowDuration);
